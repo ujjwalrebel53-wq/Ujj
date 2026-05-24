@@ -22,24 +22,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Fix package name
+      - name: Grant Gradle permission
         run: |
-          sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' app/build.gradle
-          sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' app/src/main/AndroidManifest.xml
-          find app/src -name "*.java" -exec sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' {} \;
-
-      - name: Disable all obfuscation and encryption
-        run: |
-          # minifyEnabled false
-          sed -i 's/minifyEnabled true/minifyEnabled false/g' app/build.gradle
-          # shrinkResources false
-          sed -i 's/shrinkResources true/shrinkResources false/g' app/build.gradle
-          # proguard disable
-          sed -i 's/useProguard true/useProguard false/g' app/build.gradle
-
-      - name: Disable proguard rules
-        run: |
-          echo "" > app/proguard-rules.pro
+          gradle wrapper --gradle-version 8.4
+          chmod +x gradlew
 
       - name: Create app icons
         run: |
@@ -59,18 +45,16 @@ jobs:
               app/src/main/res/mipmap-${dpi}/ic_launcher_round.png
           done
 
-      - name: Grant Gradle permission
+      - name: Disable obfuscation in build.gradle
         run: |
-          gradle wrapper --gradle-version 8.4
-          chmod +x gradlew
+          sed -i 's/minifyEnabled true/minifyEnabled false/g' app/build.gradle
+          sed -i 's/shrinkResources true/shrinkResources false/g' app/build.gradle
+
+      - name: Clear proguard rules
+        run: echo "" > app/proguard-rules.pro
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-build-cache
-
-      - name: Verify APK not obfuscated
-        run: |
-          sudo apt-get install -y aapt
-          aapt dump badging app/build/outputs/apk/debug/app-debug.apk | head -20
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
