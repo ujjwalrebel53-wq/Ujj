@@ -19,14 +19,29 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Fix gradle wrapper version
+        run: |
+          mkdir -p gradle/wrapper
+          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-bin.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+
       - name: Fix package name in Java files
         run: |
           find app/src -name "*.java" -exec sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' {} \;
           sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' app/build.gradle
 
-      - name: Grant Gradle permission
+      - name: Create gradlew
         run: |
-          gradle wrapper --gradle-version 8.4 --distribution-type bin --force
+          curl -sL https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradlew -o gradlew || \
+          cat > gradlew << 'GRADLEW'
+          #!/bin/sh
+          exec gradle "$@"
+          GRADLEW
           chmod +x gradlew
 
       - name: Create app icons
@@ -53,8 +68,13 @@ jobs:
           sed -i 's/shrinkResources true/shrinkResources false/g' app/build.gradle
           echo "" > app/proguard-rules.pro
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.4"
+
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-build-cache --warning-mode none
+        run: gradle assembleDebug --no-build-cache --warning-mode none
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
