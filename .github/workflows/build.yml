@@ -19,9 +19,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
       - name: Fix package name in Java files
         run: |
           find app/src -name "*.java" -exec sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' {} \;
@@ -29,7 +26,7 @@ jobs:
 
       - name: Grant Gradle permission
         run: |
-          gradle wrapper --gradle-version 8.4
+          gradle wrapper --gradle-version 8.4 --distribution-type bin --force
           chmod +x gradlew
 
       - name: Create app icons
@@ -57,7 +54,7 @@ jobs:
           echo "" > app/proguard-rules.pro
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-build-cache
+        run: ./gradlew assembleDebug --no-build-cache --warning-mode none
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
