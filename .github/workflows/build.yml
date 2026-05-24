@@ -22,6 +22,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Fix package name
+        run: |
+          sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' app/build.gradle
+          sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' app/src/main/AndroidManifest.xml
+          find app/src -name "*.java" -exec sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' {} \;
+
       - name: Grant Gradle permission
         run: |
           gradle wrapper --gradle-version 8.4
