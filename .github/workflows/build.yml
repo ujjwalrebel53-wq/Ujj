@@ -19,7 +19,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Fix gradle wrapper version
+      - name: Fix gradle wrapper
         run: |
           mkdir -p gradle/wrapper
           cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
@@ -30,11 +30,57 @@ jobs:
           zipStorePath=wrapper/dists
           EOF
 
-      - name: Fix package name in Java files
+      - name: Disable all obfuscation
+        run: |
+          sed -i 's/minifyEnabled true/minifyEnabled false/g' app/build.gradle
+          sed -i 's/shrinkResources true/shrinkResources false/g' app/build.gradle
+          cat > app/proguard-rules.pro << 'EOF'
+          -dontshrink
+          -dontoptimize
+          -dontobfuscate
+          -keepattributes *
+          -keep class ** { *; }
+          -keepclassmembers class ** { *; }
+          EOF
+
+      - name: Fix package name
         run: |
           find app/src -name "*.java" -exec sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' {} \;
           sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' app/build.gradle
+          sed -i 's/namespace .*/namespace '"'"'com.spinplay99.adminpanel'"'"'/g' app/build.gradle
+          sed -i 's/applicationId .*/applicationId "com.spinplay99.adminpanel"/g' app/build.gradle
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.4"
+
+      - name: Create app icons
+        run: |
+          sudo apt-get install -y imagemagick
+          for dpi in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p app/src/main/res/mipmap-${dpi}
+            case $dpi in
+              mdpi) size=48 ;;
+              hdpi) size=72 ;;
+              xhdpi) size=96 ;;
+              xxhdpi) size=144 ;;
+              xxxhdpi) size=192 ;;
+            esac
+            convert -size ${size}x${size} xc:#FF6B1A \
+              app/src/main/res/mipmap-${dpi}/ic_launcher.png
+            convert -size ${size}x${size} xc:#FF6B1A \
+              app/src/main/res/mipmap-${dpi}/ic_launcher_round.png
+          done
+
+      - name: Build Debug APK
+        run: gradle assembleDebug --no-build-cache
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpinPlay99-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
       - name: Create gradlew
         run: |
           curl -sL https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradlew -o gradlew || \
