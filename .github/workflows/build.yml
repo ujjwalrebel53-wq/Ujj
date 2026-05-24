@@ -28,6 +28,24 @@ jobs:
           sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' app/src/main/AndroidManifest.xml
           find app/src -name "*.java" -exec sed -i 's/com.spinplay99.app/com.spinplay99.adminpanel/g' {} \;
 
+      - name: Create app icons
+        run: |
+          sudo apt-get install -y imagemagick
+          for dpi in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p app/src/main/res/mipmap-${dpi}
+            case $dpi in
+              mdpi) size=48 ;;
+              hdpi) size=72 ;;
+              xhdpi) size=96 ;;
+              xxhdpi) size=144 ;;
+              xxxhdpi) size=192 ;;
+            esac
+            convert -size ${size}x${size} xc:#FF6B1A \
+              app/src/main/res/mipmap-${dpi}/ic_launcher.png
+            convert -size ${size}x${size} xc:#FF6B1A \
+              app/src/main/res/mipmap-${dpi}/ic_launcher_round.png
+          done
+
       - name: Grant Gradle permission
         run: |
           gradle wrapper --gradle-version 8.4
