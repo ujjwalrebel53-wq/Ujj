@@ -1,0 +1,15 @@
+{
+  "app_name": "Rebel AI",
+  "app_label": "Rebel AI",
+  "package_name": "com.rebelbhaiya.rebelai",
+  "tagline": "Voice se phone par execution — Rebel Bhaiya ka assistant",
+  "creator": "Rebel Bhaiya (Ujjwal Tiwari)",
+  "creator_handle": "@RebelBhaiya",
+  "version": "1.0.0",
+  "version_code": 1,
+  "website_url": "https://yourdomain.com/RebelIrisai.php",
+  "server_url": "https://yourdomain.com/RebelIrisai.php",
+  "apk_download": "https://yourdomain.com/downloads/rebel-ai.apk",
+  "primary_color": "#10b981",
+  "accent_color": "#06b6d4"
+}
