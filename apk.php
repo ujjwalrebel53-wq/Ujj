@@ -1,19 +1,16 @@
 <?php
 /**
- * Rebel AI — APK Build Configuration
- * Created by Rebel Bhaiya (Ujjwal Tiwari)
+ * IRIS AI — Site & APK Configuration Panel
+ * Matches irisaiw.vercel.app admin styling
  *
- * Usage:
- *   - Browser: apk.php          → admin panel (edit settings)
- *   - JSON API: apk.php?format=json  → Android app / build scripts read this
- *   - Website: RebelIrisai.php reads same rebel_apk_config.json
- *
- * First login default password: rebel2026  (change in panel immediately)
+ * Browser: apk.php | JSON: apk.php?format=json
+ * Default password: rebel2026 (change after first login)
  */
 
 declare(strict_types=1);
 
 session_start();
+require_once __DIR__ . '/includes/config.php';
 
 const REBEL_CONFIG_FILE = __DIR__ . '/rebel_apk_config.json';
 const REBEL_ADMIN_PASS_FILE = __DIR__ . '/.rebel_apk_admin_pass';
@@ -23,12 +20,14 @@ function rebelDefaultConfig(): array
 {
     return [
         // ── Branding ──
-        'app_name'        => 'Rebel AI',
-        'app_label'       => 'Rebel AI',
-        'package_name'    => 'com.rebelbhaiya.rebelai',
-        'tagline'         => 'Voice se phone par execution — Rebel Bhaiya ka assistant',
-        'creator'         => 'Rebel Bhaiya (Ujjwal Tiwari)',
-        'creator_handle'  => '@RebelBhaiya',
+        'app_name'        => 'IRIS AI',
+        'app_label'       => 'IRIS',
+        'package_name'    => 'com.iris.neuralos',
+        'tagline'         => 'Integrated Responsive Intelligence System',
+        'creator'         => 'Harsh Pandey',
+        'creator_handle'  => '@201Harsh',
+        'cli_command'     => 'npm install -g iris-ai',
+        'mini_cli'        => 'npm install -g iris-mini',
 
         // ── Version (APK build mein ye values use karo) ──
         'version'         => '1.0.0',
@@ -51,7 +50,7 @@ function rebelDefaultConfig(): array
         'primary_color'   => '#10b981',
         'accent_color'    => '#06b6d4',
         'background_color'=> '#030303',
-        'splash_title'    => 'Rebel AI',
+        'splash_title'    => 'IRIS AI',
         'splash_subtitle' => 'Initializing neural uplink…',
 
         // ── App behavior flags ──
@@ -64,13 +63,11 @@ function rebelDefaultConfig(): array
 
         // ── Offline page text ──
         'offline_title'   => 'Connection Error',
-        'offline_message' => 'Server se connect nahi ho paaya. Internet check karke dubara try karo.',
+        'offline_message' => 'Unable to connect to server. Check your internet connection and try again.',
 
-        // ── About (JSON mein app "About" screen ke liye) ──
-        'about_text'      => 'Rebel AI — Created by Rebel Bhaiya (Ujjwal Tiwari). Voice-first intelligent assistant for your phone.',
+        'about_text'      => 'IRIS AI — The Autonomous Neural OS Agent. Local-first execution layer for your device.',
 
-        // ── Build notes (sirf admin panel — JSON mein bhi jaata hai) ──
-        'build_notes'     => "APK banate waqt:\n1. app_name → strings.xml\n2. server_url → MainActivity SERVER_URL\n3. version / version_code → build.gradle\n4. package_name → applicationId",
+        'build_notes'     => "Build checklist:\n1. app_name → strings.xml\n2. server_url → MainActivity SERVER_URL\n3. version / version_code → build.gradle\n4. package_name → applicationId",
     ];
 }
 
@@ -163,8 +160,8 @@ if (isset($_GET['format']) && $_GET['format'] === 'json') {
     header('Cache-Control: no-cache, must-revalidate');
     echo json_encode([
         'ok'     => true,
-        'brand'  => 'Rebel AI',
-        'creator'=> 'Rebel Bhaiya (Ujjwal Tiwari)',
+        'brand'  => 'IRIS AI',
+        'creator'=> 'Harsh Pandey',
         'config' => rebelPublicConfig(rebelLoadConfig()),
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
@@ -200,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
         'primary_color', 'accent_color', 'background_color',
         'splash_title', 'splash_subtitle',
         'offline_title', 'offline_message', 'about_text', 'build_notes',
-        'user_agent_suffix', 'firebase_db_path',
+        'user_agent_suffix', 'firebase_db_path', 'cli_command', 'mini_cli',
     ];
     foreach ($textFields as $key) {
         if (isset($_POST[$key])) {
@@ -226,35 +223,34 @@ rebelRequireLogin();
 $cfg = rebelLoadConfig();
 $saved = isset($_GET['saved']);
 $jsonUrl = rebelGuessSelfJsonUrl();
-$websiteFile = dirname($_SERVER['SCRIPT_NAME'] ?? '') . '/RebelIrisai.php';
-$websiteUrl = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http')
-    . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $websiteFile;
+$websiteUrl = siteUrl('RebelIrisai.php');
 
 function rebelShowLogin(string $error = ''): void
 {
     header('Content-Type: text/html; charset=utf-8');
+    $logo = assetUrl('img/Logo.png');
     ?>
     <!DOCTYPE html>
-    <html lang="hi"><head>
+    <html lang="en"><head>
       <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Rebel AI — APK Config Login</title>
-      <style>
-        body{margin:0;min-height:100vh;display:grid;place-items:center;background:#030303;color:#e4e4e7;font-family:system-ui,sans-serif}
-        form{background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);padding:32px;border-radius:16px;width:min(360px,92vw)}
-        h1{font-size:1.2rem;margin:0 0 8px;color:#10b981}
-        p{font-size:.85rem;color:#71717a;margin:0 0 20px}
-        input{width:100%;padding:12px;border-radius:8px;border:1px solid #333;background:#111;color:#fff;margin-bottom:12px}
-        button{width:100%;padding:12px;border:0;border-radius:8px;background:#10b981;color:#000;font-weight:700;cursor:pointer}
-        .err{color:#f87171;font-size:.85rem;margin-bottom:12px}
-      </style>
-    </head><body>
-      <form method="post">
-        <h1>👁 Rebel AI APK Config</h1>
-        <p>Created by Rebel Bhaiya (Ujjwal Tiwari)</p>
-        <?php if ($error !== ''): ?><div class="err"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+      <title>IRIS — Config Login</title>
+      <link rel="stylesheet" href="<?= assetUrl('css/iris-tailwind.css') ?>">
+      <link rel="stylesheet" href="<?= assetUrl('css/custom.css') ?>">
+    </head>
+    <body class="min-h-screen bg-black text-white flex items-center justify-center p-6 font-sans">
+      <form method="post" class="w-full max-w-sm bg-black/60 backdrop-blur-xl border border-[#10b981]/20 rounded-2xl p-8 shadow-[0_0_40px_rgba(16,185,129,0.12)]">
+        <div class="flex items-center gap-3 mb-6">
+          <img src="<?= esc($logo) ?>" alt="IRIS" width="36" height="36" class="rounded-full">
+          <span class="text-xl font-black text-[#10b981] tracking-tighter">IRIS</span>
+        </div>
+        <h1 class="text-lg font-bold mb-1">Config Panel</h1>
+        <p class="text-sm text-zinc-500 mb-6 font-mono">IRIS_OS // ADMIN_VAULT</p>
+        <?php if ($error !== ''): ?><p class="text-red-400 text-sm mb-4"><?= esc($error) ?></p><?php endif; ?>
         <input type="hidden" name="action" value="login">
-        <input type="password" name="password" placeholder="Admin password" required autofocus>
-        <button type="submit">Login</button>
+        <input type="password" name="password" placeholder="Admin password" required autofocus
+          class="w-full px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800 text-white mb-4 focus:border-[#10b981] outline-none">
+        <button type="submit" class="w-full py-3 rounded-full bg-[#10b981]/20 border border-[#10b981]/50 text-white font-bold text-xs tracking-[0.2em] uppercase hover:bg-[#10b981] hover:text-black transition-all">Authenticate</button>
+        <p class="text-[10px] text-zinc-600 mt-4 font-mono text-center">Default: rebel2026</p>
       </form>
     </body></html>
     <?php
@@ -274,72 +270,45 @@ function rebelChecked(bool $v): string
 }
 ?>
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rebel AI — APK Configuration</title>
-  <style>
-    :root { --bg:#0a0a0a; --card:#111; --border:#222; --text:#e4e4e7; --muted:#71717a; --pri:#10b981; }
-    * { box-sizing:border-box; }
-    body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
-    .top { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
-      padding:16px 20px; border-bottom:1px solid var(--border); position:sticky; top:0; background:rgba(10,10,10,.95); z-index:10; }
-    .top h1 { margin:0; font-size:1.1rem; color:var(--pri); }
-    .top a { color:var(--muted); font-size:.85rem; }
-    .wrap { max-width:900px; margin:0 auto; padding:20px; }
-    .ok { background:#052e1e; border:1px solid var(--pri); color:var(--pri); padding:12px; border-radius:8px; margin-bottom:16px; }
-    fieldset { border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:20px; }
-    legend { color:var(--pri); font-weight:700; padding:0 8px; }
-    label { display:block; font-size:.8rem; color:var(--muted); margin:12px 0 4px; }
-    input[type=text], input[type=url], input[type=email], input[type=number], input[type=password], textarea {
-      width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:#000; color:var(--text); font-size:.9rem;
-    }
-    textarea { min-height:72px; resize:vertical; font-family:inherit; }
-    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-    @media(max-width:600px){ .row2 { grid-template-columns:1fr; } }
-    .chk { display:flex; align-items:center; gap:8px; margin-top:12px; }
-    .chk input { width:auto; }
-    .chk label { margin:0; color:var(--text); }
-    .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:24px; }
-    button, .btn-link {
-      padding:12px 20px; border-radius:8px; font-weight:700; cursor:pointer; text-decoration:none; font-size:.9rem; border:none;
-    }
-    .btn-save { background:var(--pri); color:#000; }
-    .btn-json { background:#1e293b; color:#94a3b8; }
-    .hint { font-size:.75rem; color:var(--muted); margin-top:4px; }
-    code { background:#1a1a1a; padding:2px 6px; border-radius:4px; font-size:.8rem; }
-  </style>
+  <title>IRIS — Configuration</title>
+  <link rel="stylesheet" href="<?= assetUrl('css/iris-tailwind.css') ?>">
+  <link rel="stylesheet" href="<?= assetUrl('css/custom.css') ?>">
 </head>
-<body>
-  <div class="top">
-    <h1>👁 Rebel AI — APK Config Panel</h1>
-    <div>
-      <a href="<?= rebelEsc($jsonUrl) ?>" target="_blank">JSON API</a> ·
-      <a href="<?= rebelEsc($websiteUrl) ?>" target="_blank">Website</a> ·
-      <a href="apk.php?logout=1">Logout</a>
+<body class="bg-black text-white min-h-screen font-sans">
+  <header class="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-b border-[#10b981]/20 bg-black/90 backdrop-blur-lg">
+    <div class="flex items-center gap-3">
+      <img src="<?= assetUrl('img/Logo.png') ?>" alt="IRIS" width="32" height="32" class="rounded-full">
+      <h1 class="text-lg font-black text-[#10b981] tracking-tighter">IRIS Config</h1>
     </div>
-  </div>
+    <div class="flex flex-wrap gap-4 text-xs font-mono uppercase tracking-widest text-zinc-500">
+      <a href="<?= rebelEsc($jsonUrl) ?>" target="_blank" class="hover:text-[#10b981]">JSON API</a>
+      <a href="<?= rebelEsc($websiteUrl) ?>" target="_blank" class="hover:text-[#10b981]">Website</a>
+      <a href="apk.php?logout=1" class="hover:text-[#10b981]">Logout</a>
+    </div>
+  </header>
 
-  <div class="wrap">
+  <div class="max-w-3xl mx-auto px-6 py-10">
     <?php if ($saved): ?>
-      <div class="ok">✅ Config save ho gayi. APK build / app dubara config pull karega.</div>
+      <div class="mb-6 p-4 rounded-lg border border-[#10b981]/40 bg-[#10b981]/10 text-[#34d399] font-mono text-sm">Configuration saved successfully.</div>
     <?php endif; ?>
 
-    <p style="color:var(--muted);font-size:.9rem">
-      Ye file <strong>rebel_apk_config.json</strong> banati hai — <code>RebelIrisai.php</code> website bhi isi se data leti hai.
-      Android app mein <code>SERVER_URL</code> = <code>server_url</code> field.
+    <p class="text-zinc-500 text-sm font-mono mb-8">
+      Writes <code class="text-[#10b981]">rebel_apk_config.json</code> — used by <code class="text-[#10b981]">RebelIrisai.php</code> and Android WebView via <code class="text-[#10b981]">server_url</code>.
     </p>
 
     <form method="post">
       <input type="hidden" name="action" value="save">
 
-      <fieldset>
-        <legend>Branding</legend>
-        <div class="row2">
+      <fieldset class="border border-zinc-800 rounded-xl p-6 mb-6">
+        <legend class="text-[#10b981] font-bold px-2">Branding</legend>
+        <div class="grid md:grid-cols-2 gap-4">
           <div>
-            <label>App Name (display)</label>
-            <input type="text" name="app_name" value="<?= rebelEsc($cfg['app_name'] ?? '') ?>">
+            <label class="block text-xs text-zinc-500 mt-2 mb-1">App Name (display)</label>
+            <input type="text" name="app_name" value="<?= rebelEsc($cfg['app_name'] ?? '') ?>" class="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-white">
           </div>
           <div>
             <label>App Label (launcher)</label>
@@ -441,9 +410,9 @@ function rebelChecked(bool $v): string
         <p class="hint">Password file: <code>.rebel_apk_admin_pass</code></p>
       </fieldset>
 
-      <div class="actions">
-        <button type="submit" class="btn-save">💾 Save Config</button>
-        <a class="btn-link btn-json" href="<?= rebelEsc($jsonUrl) ?>" target="_blank">{ } Preview JSON</a>
+      <div class="flex flex-wrap gap-4 mt-8">
+        <button type="submit" class="px-8 py-3 rounded-full bg-[#10b981]/20 border border-[#10b981]/50 text-white font-bold text-xs tracking-[0.2em] uppercase hover:bg-[#10b981] hover:text-black transition-all">Save Config</button>
+        <a href="<?= rebelEsc($jsonUrl) ?>" target="_blank" class="px-8 py-3 rounded-full border border-zinc-800 text-zinc-400 font-bold text-xs tracking-widest uppercase hover:border-[#10b981] hover:text-[#10b981] transition-all">Preview JSON</a>
       </div>
     </form>
   </div>

@@ -1,12 +1,24 @@
-# Rebel AI (Ujjwal Tiwari)
+# IRIS AI — PHP Website (irisaiw.vercel.app clone)
 
-## PHP files
+Static PHP deployment matching [https://irisaiw.vercel.app/](https://irisaiw.vercel.app/).
 
-| File | Kaam |
-|------|------|
-| `RebelIrisai.php` | Rebel AI official website (landing page) |
-| `apk.php` | APK config panel + JSON API (`?format=json`) |
+## Quick start
 
-**Setup:** Server par dono files upload karo. `apk.php` kholo → login (`rebel2026` default) → settings save. Website automatically `rebel_apk_config.json` se colors/links leti hai.
+See **[DEPLOY.md](DEPLOY.md)** for full `wget` commands and VPS setup.
 
-**Android:** `apk.php?format=json` se `server_url`, `app_name`, `version` read karke APK build customize karo.
+- Home: `RebelIrisai.php`
+- Config: `apk.php` (password default: `rebel2026`)
+
+## Structure
+
+```
+RebelIrisai.php    # Landing page
+about.php          # About
+features.php       # Features
+how-to-install.php # Install
+guide.php          # API keys
+download.php       # Download
+apk.php            # Admin + JSON API
+includes/          # Header, footer, config
+assets/            # CSS, JS, images from IRIS site
+```
