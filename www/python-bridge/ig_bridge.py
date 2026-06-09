@@ -19,6 +19,20 @@ from instagrapi.exceptions import (
 )
 
 CODE_RE = re.compile(r"\b(\d{6})\b")
+LOG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "logs", "live.log")
+
+
+def plog(level: str, message: str, **ctx):
+    entry = {
+        "id": f"log_py_{time.time()}",
+        "time": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
+        "level": level,
+        "message": message,
+        "context": ctx,
+    }
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 class TempMail:
@@ -115,6 +129,7 @@ class TempMail:
         return f"{full.get('subject','')} {full.get('textBody','')} {full.get('htmlBody','')}"
 
     def wait_for_code(self, timeout: int = 120) -> str:
+        plog("INFO", f"OTP wait shuru: {self.address}")
         seen = set()
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -126,8 +141,11 @@ class TempMail:
                 body = self._read_body(msg)
                 m = CODE_RE.search(body)
                 if m:
+                    plog("SUCCESS", f"OTP mil gaya: {m.group(1)}", email=self.address)
                     return m.group(1)
+            plog("DEBUG", "OTP abhi nahi aaya, 5s wait...")
             time.sleep(5)
+        plog("ERROR", "OTP timeout — email mein code nahi aaya", email=self.address)
         raise RuntimeError("OTP not received from temp email")
 
 
@@ -177,25 +195,37 @@ def action_login(params: dict) -> dict:
 
 
 def action_signup(params: dict) -> dict:
+    username = params["username"]
+    full_name = params.get("full_name", "")
+    plog("INFO", f"Signup shuru: @{username}", name=full_name)
+
     client = build_client(params.get("proxy", ""))
+    plog("DEBUG", "Instagram client ready, device_id set")
+
     temp_mail = None
     email = (params.get("email") or "").strip()
 
     if not email:
+        plog("INFO", "Temp email bana rahe hain...")
         temp_mail = TempMail()
         email = temp_mail.address
+        plog("SUCCESS", f"Temp email: {email}", provider=temp_mail.provider)
+    else:
+        plog("INFO", f"Email use: {email}")
 
     preset_code = (params.get("verification_code") or "").strip()
 
-    def code_handler(username, choice):
+    def code_handler(u, choice):
         if preset_code:
             return preset_code
         if temp_mail:
+            plog("INFO", "Instagram ne email bheji, OTP fetch kar rahe hain...")
             return temp_mail.wait_for_code(120)
         return ""
 
     client.challenge_code_handler = code_handler
 
+    plog("INFO", "Instagram API signup call...")
     user = client.signup(
         username=params["username"],
         password=params["password"],
@@ -206,6 +236,7 @@ def action_signup(params: dict) -> dict:
         month=params.get("month"),
         day=params.get("day"),
     )
+    plog("SUCCESS", f"Account ban gaya: @{user.username or username}", email=email)
     return {
         "username": user.username or params["username"],
         "full_name": params.get("full_name", ""),
@@ -245,6 +276,7 @@ def main() -> None:
         print(json.dumps({"success": False, "error": f"Rate limited: {exc}"}))
     except (LoginRequired, ClientError, AssertionError, Exception) as exc:
         msg = str(exc)
+        plog("ERROR", f"Bridge error [{action}]: {msg}")
         needs_code = "code" in msg.lower() or "verification" in msg.lower() or "otp" in msg.lower()
         print(json.dumps({"success": False, "error": msg, "needs_code": needs_code}))
 

@@ -3,6 +3,7 @@ let accounts = [];
 let selectedIds = new Set();
 let currentPage = "dashboard";
 let creatorPollTimer = null;
+let logsEventSource = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   initNav();
@@ -31,8 +32,14 @@ function switchPage(page) {
     loadCreatorJobs();
     loadProxyStatus();
     startCreatorPolling();
+    stopLogsStream();
+  } else if (page === "logs") {
+    loadLogs();
+    startLogsStream();
+    stopCreatorPolling();
   } else {
     stopCreatorPolling();
+    stopLogsStream();
   }
 }
 
@@ -649,6 +656,64 @@ function showCredentials(data) {
     </div>
     <p style="color:var(--warning);font-size:0.85rem;margin-top:12px">⚠️ Credentials save kar lo — baad mein dubara nahi dikhenge!</p>`;
   openModal("creds-modal");
+}
+
+function renderLogEntry(entry) {
+  const level = (entry.level || "INFO").toLowerCase();
+  const ctx = entry.context && Object.keys(entry.context).length
+    ? " " + JSON.stringify(entry.context)
+    : "";
+  return `<div class="log-line log-${level}">
+    <span class="log-time">${esc(entry.time || "")}</span>
+    <span class="log-level">[${esc(entry.level || "")}]</span>
+    <span class="log-msg">${esc(entry.message || "")}${esc(ctx)}</span>
+  </div>`;
+}
+
+async function loadLogs() {
+  const box = document.getElementById("live-logs");
+  if (!box) return;
+  try {
+    const logs = await api("/api/logs?limit=300");
+    box.innerHTML = logs.length ? logs.map(renderLogEntry).join("") : '<div class="log-line log-info">No logs yet — Account Creator try karo</div>';
+    box.scrollTop = box.scrollHeight;
+  } catch (e) {
+    box.innerHTML = `<div class="log-line log-error">${esc(e.message)}</div>`;
+  }
+}
+
+function startLogsStream() {
+  stopLogsStream();
+  if (!window.EventSource) return;
+  logsEventSource = new EventSource("/api/logs/stream");
+  logsEventSource.onmessage = (e) => {
+    try {
+      const entry = JSON.parse(e.data);
+      const box = document.getElementById("live-logs");
+      if (!box || currentPage !== "logs") return;
+      box.insertAdjacentHTML("beforeend", renderLogEntry(entry));
+      if (box.children.length > 500) box.removeChild(box.firstChild);
+      box.scrollTop = box.scrollHeight;
+    } catch (_) {}
+  };
+  logsEventSource.onerror = () => {
+    document.getElementById("logs-status").textContent = "● RECONNECTING";
+    setTimeout(() => { if (currentPage === "logs") startLogsStream(); }, 3000);
+  };
+}
+
+function stopLogsStream() {
+  if (logsEventSource) {
+    logsEventSource.close();
+    logsEventSource = null;
+  }
+}
+
+async function clearLogs() {
+  if (!confirm("Saare logs clear karein?")) return;
+  await api("/api/logs/clear", { method: "POST" });
+  document.getElementById("live-logs").innerHTML = "";
+  toast("Logs cleared");
 }
 
 document.getElementById("search-accounts")?.addEventListener("input", renderAccounts);

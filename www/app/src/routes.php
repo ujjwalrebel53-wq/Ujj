@@ -202,5 +202,15 @@ function routeApi(string $method, string $uri): void
         }
     }
 
+    // Live logs
+    if ($uri === '/api/logs' && $method === 'GET') {
+        $limit = (int) ($_GET['limit'] ?? 200);
+        Response::json(LiveLogger::tail($limit));
+    }
+    if ($uri === '/api/logs/clear' && $method === 'POST') {
+        LiveLogger::clear();
+        Response::json(['ok' => true]);
+    }
+
     Response::error('Not found', 404);
 }

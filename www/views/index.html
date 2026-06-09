@@ -16,6 +16,7 @@
       <button class="nav-item active" data-page="dashboard">📊 Dashboard</button>
       <button class="nav-item" data-page="accounts">👥 Accounts</button>
       <button class="nav-item" data-page="creator">🤖 Account Creator</button>
+      <button class="nav-item" data-page="logs">🔴 Live Logs</button>
       <button class="nav-item" data-page="activity">📋 Activity Log</button>
     </aside>
 
@@ -185,6 +186,22 @@
           <button class="btn btn-secondary btn-sm" onclick="bulkRefresh()">Bulk Refresh</button>
         </div>
         <div id="accounts-grid" class="accounts-grid"></div>
+      </section>
+
+      <!-- Live Logs -->
+      <section id="page-logs" class="page">
+        <div class="page-header">
+          <div>
+            <h1>Live Logs</h1>
+            <p>Real-time — exactly kya ho raha hai, error kahan aa raha hai</p>
+          </div>
+          <div class="toolbar" style="margin:0">
+            <span id="logs-status" class="logs-live-badge">● LIVE</span>
+            <button class="btn btn-secondary btn-sm" onclick="clearLogs()">Clear</button>
+            <button class="btn btn-secondary btn-sm" onclick="loadLogs()">Refresh</button>
+          </div>
+        </div>
+        <div id="live-logs" class="live-logs-terminal"></div>
       </section>
 
       <!-- Activity -->

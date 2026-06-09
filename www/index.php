@@ -28,6 +28,12 @@ if (str_starts_with($uri, '/static/')) {
     exit;
 }
 
+if ($uri === '/api/logs/stream') {
+    appBoot();
+    LiveLogger::stream();
+    exit;
+}
+
 if (str_starts_with($uri, '/api/')) {
     require_once BASE_PATH . '/app/src/routes.php';
     routeApi($method, $uri);

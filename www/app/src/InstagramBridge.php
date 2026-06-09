@@ -10,18 +10,15 @@ final class InstagramBridge
         if ($fromEnv !== '') {
             return $fromEnv;
         }
-
         $home = getenv('HOME') ?: '';
         $candidates = array_filter([
             BASE_PATH . '/python-bridge/venv/bin/python',
-            getenv('PYTHON_BRIDGE_BIN') ?: null,
             $home ? $home . '/ig-handler/instagram-handler/venv/bin/python' : null,
             '/usr/bin/python',
             'python',
         ]);
-
         foreach ($candidates as $bin) {
-            if ($bin === 'python' || $bin === 'python3' || is_executable($bin)) {
+            if ($bin === 'python' || is_executable($bin)) {
                 return $bin;
             }
         }
@@ -34,6 +31,8 @@ final class InstagramBridge
         $script = BASE_PATH . '/python-bridge/ig_bridge.py';
         $payload = json_encode(['action' => $action, 'params' => $params], JSON_UNESCAPED_UNICODE);
 
+        LiveLogger::debug("Bridge call: $action", ['python' => $python]);
+
         $descriptors = [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
@@ -43,6 +42,7 @@ final class InstagramBridge
         $proc = proc_open($cmd, $descriptors, $pipes, BASE_PATH);
 
         if (!is_resource($proc)) {
+            LiveLogger::error('Python bridge start fail');
             throw new RuntimeException('Failed to start Instagram bridge');
         }
 
@@ -52,12 +52,28 @@ final class InstagramBridge
         $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        proc_close($proc);
+        $exit = proc_close($proc);
+
+        if ($stderr) {
+            foreach (explode("\n", trim($stderr)) as $line) {
+                if ($line !== '') {
+                    LiveLogger::debug('Bridge stderr: ' . $line);
+                }
+            }
+        }
 
         $result = json_decode($stdout ?: '{}', true);
         if (!is_array($result)) {
+            LiveLogger::error('Bridge invalid response', ['stdout' => substr($stdout ?: '', 0, 500), 'exit' => $exit]);
             throw new RuntimeException('Bridge invalid response: ' . ($stderr ?: $stdout));
         }
+
+        if (!empty($result['success'])) {
+            LiveLogger::success("Bridge OK: $action");
+        } else {
+            LiveLogger::error("Bridge fail: $action — " . ($result['error'] ?? 'unknown'), $result);
+        }
+
         return $result;
     }
 }

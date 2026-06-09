@@ -4,10 +4,18 @@ declare(strict_types=1);
 
 final class AccountCreator
 {
-    private const FIRST_NAMES = ['Aarav', 'Vihaan', 'Arjun', 'Priya', 'Ananya', 'Diya', 'Alex', 'Jordan', 'Sam', 'Taylor'];
-    private const LAST_NAMES = ['Sharma', 'Patel', 'Singh', 'Kumar', 'Gupta', 'Verma', 'Smith', 'Johnson', 'Williams', 'Brown'];
-    private const ADJECTIVES = ['cool', 'real', 'daily', 'life', 'the', 'its', 'hey', 'just'];
-    private const NOUNS = ['vibes', 'world', 'soul', 'dream', 'life', 'mood', 'zone', 'hub'];
+    // Sirf Indian names
+    private const FIRST_NAMES = [
+        'Aarav', 'Vihaan', 'Arjun', 'Rohan', 'Kabir', 'Ishaan', 'Aditya', 'Rahul', 'Amit', 'Vikram',
+        'Suresh', 'Rajesh', 'Deepak', 'Manoj', 'Karan', 'Nikhil', 'Ravi', 'Sanjay', 'Ajay', 'Vivek',
+        'Priya', 'Ananya', 'Diya', 'Sneha', 'Riya', 'Meera', 'Kavya', 'Nisha', 'Pooja', 'Shruti',
+        'Neha', 'Kajal', 'Divya', 'Swati', 'Anjali', 'Rekha', 'Sunita', 'Lakshmi', 'Kavita', 'Geeta',
+    ];
+    private const LAST_NAMES = [
+        'Sharma', 'Patel', 'Singh', 'Kumar', 'Gupta', 'Verma', 'Reddy', 'Joshi', 'Mehta', 'Shah',
+        'Rao', 'Nair', 'Das', 'Roy', 'Mishra', 'Pandey', 'Yadav', 'Chauhan', 'Thakur', 'Malhotra',
+        'Kapoor', 'Bhatia', 'Saxena', 'Tiwari', 'Dubey', 'Shukla', 'Agarwal', 'Banerjee', 'Iyer', 'Menon',
+    ];
 
     private static array $pendingCodes = [];
 
@@ -30,15 +38,13 @@ final class AccountCreator
 
     public static function generateUsername(string $prefix = ''): string
     {
-        $base = preg_replace('/[^a-z0-9_]/', '', strtolower($prefix)) ?: (self::ADJECTIVES[array_rand(self::ADJECTIVES)] . '_' . self::NOUNS[array_rand(self::NOUNS)]);
-        $suffix = '';
-        for ($i = 0; $i < random_int(4, 6); $i++) {
-            $suffix .= chr(random_int(97, 122));
+        if (trim($prefix) !== '') {
+            $base = preg_replace('/[^a-z0-9_]/', '', strtolower($prefix));
+            return substr($base . '_' . random_int(1000, 9999), 0, 30);
         }
-        if (random_int(0, 1)) {
-            $suffix .= random_int(10, 99);
-        }
-        return substr($base . '_' . $suffix, 0, 30);
+        $first = strtolower(self::FIRST_NAMES[array_rand(self::FIRST_NAMES)]);
+        $last = strtolower(self::LAST_NAMES[array_rand(self::LAST_NAMES)]);
+        return substr($first . '_' . $last . random_int(10, 9999), 0, 30);
     }
 
     public static function previewProfiles(int $count = 5, string $prefix = ''): array
@@ -58,8 +64,7 @@ final class AccountCreator
     public static function submitVerificationCode(int $jobId, string $code): void
     {
         self::$pendingCodes[$jobId] = trim($code);
-        $file = DATA_PATH . "/pending_code_{$jobId}.txt";
-        file_put_contents($file, trim($code));
+        file_put_contents(DATA_PATH . "/pending_code_{$jobId}.txt", trim($code));
     }
 
     private static function getVerificationCode(int $jobId): string
@@ -68,10 +73,7 @@ final class AccountCreator
             return self::$pendingCodes[$jobId];
         }
         $file = DATA_PATH . "/pending_code_{$jobId}.txt";
-        if (is_file($file)) {
-            return trim((string) file_get_contents($file));
-        }
-        return '';
+        return is_file($file) ? trim((string) file_get_contents($file)) : '';
     }
 
     public static function createInstagramAccount(
@@ -84,13 +86,15 @@ final class AccountCreator
         ?string $email = null,
         ?string $verificationCode = null
     ): array {
-        // Email khali = Python bridge khud temp mail banayega + OTP auto fetch karega
-        // OTP Instagram email bhejne KE BAAD aata hai — isliye PHP se pehle mat mango
+        LiveLogger::info("Account create shuru: @$username", ['job_id' => $jobId, 'name' => $fullName]);
+
         $year = random_int(1994, 2002);
         $month = random_int(1, 12);
         $day = random_int(1, 28);
-
         $proxy = ProxyManager::resolveProxy($proxy);
+
+        LiveLogger::debug('Proxy assign hua', ['proxy' => $proxy ? 'yes' : 'no']);
+
         $bridgeParams = [
             'username' => $username,
             'password' => $password,
@@ -100,26 +104,35 @@ final class AccountCreator
             'month' => $month,
             'day' => $day,
             'auto_email' => true,
+            'job_id' => $jobId,
         ];
         if ($email) {
             $bridgeParams['email'] = $email;
+            LiveLogger::info('Custom email use ho rahi hai', ['email' => $email]);
+        } else {
+            LiveLogger::info('Temp email auto banegi + OTP auto fetch');
         }
         $manualCode = $verificationCode ?: self::getVerificationCode($jobId);
         if ($manualCode) {
             $bridgeParams['verification_code'] = $manualCode;
         }
 
+        LiveLogger::info('Instagram signup bridge call...');
         $result = InstagramBridge::call('signup', $bridgeParams);
 
         if (empty($result['success'])) {
+            $err = $result['error'] ?? 'Signup failed';
+            LiveLogger::error('Signup fail: ' . $err, ['job_id' => $jobId]);
             if (!empty($result['needs_code'])) {
-                Database::updateCreationJob($jobId, ['status' => 'waiting_code', 'error' => $result['error'] ?? '']);
-                throw new RuntimeException($result['error'] ?? 'Verification code required', 1001);
+                Database::updateCreationJob($jobId, ['status' => 'waiting_code', 'error' => $err]);
+                throw new RuntimeException($err, 1001);
             }
-            throw new RuntimeException($result['error'] ?? 'Signup failed');
+            throw new RuntimeException($err);
         }
 
         $usedEmail = $result['data']['email'] ?? $email ?? '';
+        LiveLogger::success("Account ban gaya: @$username", ['email' => $usedEmail]);
+
         $account = Database::createAccount([
             'username' => $result['data']['username'] ?? $username,
             'password_enc' => Crypto::encrypt($password),
@@ -132,8 +145,7 @@ final class AccountCreator
             'full_name' => $fullName,
             'last_login' => Database::now(),
         ]);
-        Database::logActivity($account['id'], 'auto_create', "Account @$username created via auto-creator");
-
+        Database::logActivity($account['id'], 'auto_create', "Account @$username created");
         @unlink(DATA_PATH . "/pending_code_{$jobId}.txt");
 
         return [
@@ -148,6 +160,7 @@ final class AccountCreator
 
     public static function startSingle(array $data): array
     {
+        LiveLogger::info('Single account creation request');
         $jobProxy = ProxyManager::resolveProxy($data['proxy'] ?? '', (bool) ($data['use_webshare'] ?? true));
         $job = Database::createCreationJob([
             'username' => $data['username'] ?? self::generateUsername($data['username_prefix'] ?? ''),
@@ -195,6 +208,7 @@ final class AccountCreator
     public static function startBatch(array $data): array
     {
         $count = min((int) ($data['count'] ?? 1), 20);
+        LiveLogger::info("Batch creation shuru: $count accounts");
         $batchId = bin2hex(random_bytes(6));
         $jobs = [];
         $explicitProxy = $data['proxy'] ?? '';
@@ -218,6 +232,7 @@ final class AccountCreator
         $php = PHP_BINARY;
         $script = BASE_PATH . '/cli/worker.php';
         $delay = max($delay, 10);
+        LiveLogger::info("Background worker start (delay {$delay}s)");
         if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
             pclose(popen("start /B \"\" $php " . escapeshellarg($script) . ' ' . $delay, 'r'));
         } else {
@@ -251,6 +266,7 @@ final class AccountCreator
                 $status = $e->getCode() === 1001 ? 'waiting_code' : 'failed';
                 Database::updateCreationJob($jobId, ['status' => $status, 'error' => $e->getMessage()]);
             } catch (Throwable $e) {
+                LiveLogger::error('Worker error: ' . $e->getMessage(), ['job_id' => $jobId]);
                 Database::updateCreationJob($jobId, ['status' => 'failed', 'error' => $e->getMessage()]);
             }
             sleep($delay);
@@ -269,6 +285,7 @@ final class AccountCreator
         if (!$job) {
             throw new RuntimeException('Job not found');
         }
+        LiveLogger::info('Job retry', ['job_id' => $jobId, 'username' => $job['username']]);
         Database::updateCreationJob($jobId, ['status' => 'creating', 'error' => '']);
         try {
             $result = self::createInstagramAccount(

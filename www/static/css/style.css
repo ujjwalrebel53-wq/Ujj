@@ -580,6 +580,47 @@ body {
   }
 }
 
+.live-logs-terminal {
+  background: #0d0d12;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  height: calc(100vh - 180px);
+  min-height: 400px;
+  overflow-y: auto;
+  font-family: "Consolas", "Monaco", monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.log-line {
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  word-break: break-word;
+}
+
+.log-time { color: #666; margin-right: 8px; }
+.log-level { font-weight: 700; margin-right: 8px; }
+.log-info .log-level { color: #60a5fa; }
+.log-success .log-level { color: #22c55e; }
+.log-warn .log-level { color: #f59e0b; }
+.log-error .log-level { color: #ef4444; }
+.log-debug .log-level { color: #888; }
+.log-error .log-msg { color: #fca5a5; }
+.log-success .log-msg { color: #86efac; }
+
+.logs-live-badge {
+  color: #22c55e;
+  font-weight: 700;
+  font-size: 0.85rem;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 .proxy-status {
   background: var(--surface);
   border: 1px solid var(--border);

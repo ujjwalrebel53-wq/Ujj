@@ -32,6 +32,7 @@ if (!is_dir(SESSIONS_PATH)) {
 function appBoot(): void
 {
     $src = BASE_PATH . '/app/src';
+    require_once $src . '/LiveLogger.php';
     require_once $src . '/Database.php';
     require_once $src . '/ProxyManager.php';
     require_once $src . '/Crypto.php';
