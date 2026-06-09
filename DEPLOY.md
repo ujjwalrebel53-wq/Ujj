@@ -19,6 +19,7 @@ wget -O how-to-install.php "$BASE/how-to-install.php"
 wget -O guide.php "$BASE/guide.php"
 wget -O download.php "$BASE/download.php"
 wget -O apk.php "$BASE/apk.php"
+wget -O rebel_bots.php "$BASE/rebel_bots.php"
 
 # Includes
 mkdir -p includes
@@ -69,6 +70,7 @@ chmod 775 .
 | `guide.php` | API keys guide |
 | `download.php` | Download page |
 | `apk.php` | Config panel + JSON API |
+| `rebel_bots.php` | Legacy Telegram bot admin (from original `index.php`) |
 | `includes/*` | Shared PHP partials |
 | `assets/css/iris-tailwind.css` | Production Tailwind bundle from IRIS site |
 | `assets/css/custom.css` | IRIS animations (wave bars, scroll, etc.) |

@@ -277,6 +277,22 @@ function rebelChecked(bool $v): string
   <title>IRIS — Configuration</title>
   <link rel="stylesheet" href="<?= assetUrl('css/iris-tailwind.css') ?>">
   <link rel="stylesheet" href="<?= assetUrl('css/custom.css') ?>">
+  <style>
+    fieldset { border: 1px solid #27272a; border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+    legend { color: #10b981; font-weight: 700; padding: 0 0.5rem; }
+    label { display: block; font-size: 0.75rem; color: #71717a; margin: 0.75rem 0 0.25rem; }
+    input[type="text"], input[type="url"], input[type="email"], input[type="password"], input[type="number"], textarea {
+      width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.5rem;
+      background: #18181b; border: 1px solid #27272a; color: #fff;
+    }
+    input:focus, textarea:focus { outline: none; border-color: #10b981; }
+    textarea { min-height: 5rem; resize: vertical; }
+    .row2 { display: grid; gap: 1rem; }
+    @media (min-width: 768px) { .row2 { grid-template-columns: 1fr 1fr; } }
+    .chk { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0; }
+    .chk label { margin: 0; color: #d4d4d8; font-size: 0.875rem; }
+    .hint { font-size: 0.75rem; color: #52525b; margin-top: 0.5rem; }
+  </style>
 </head>
 <body class="bg-black text-white min-h-screen font-sans">
   <header class="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-b border-[#10b981]/20 bg-black/90 backdrop-blur-lg">
@@ -351,6 +367,14 @@ function rebelChecked(bool $v): string
         <input type="url" name="apk_download" value="<?= rebelEsc($cfg['apk_download'] ?? '') ?>">
         <label>Play Store</label>
         <input type="url" name="play_store" value="<?= rebelEsc($cfg['play_store'] ?? '') ?>">
+      </fieldset>
+
+      <fieldset>
+        <legend>CLI Commands</legend>
+        <label>Main CLI install command</label>
+        <input type="text" name="cli_command" value="<?= rebelEsc($cfg['cli_command'] ?? '') ?>" placeholder="npm install -g iris-ai">
+        <label>Mini CLI install command</label>
+        <input type="text" name="mini_cli" value="<?= rebelEsc($cfg['mini_cli'] ?? '') ?>" placeholder="npm install -g iris-mini">
       </fieldset>
 
       <fieldset>

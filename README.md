@@ -19,6 +19,7 @@ how-to-install.php # Install
 guide.php          # API keys
 download.php       # Download
 apk.php            # Admin + JSON API
+rebel_bots.php     # Legacy Telegram bot admin
 includes/          # Header, footer, config
 assets/            # CSS, JS, images from IRIS site
 ```
