@@ -501,8 +501,7 @@ async function submitCreatorSingle(e) {
       loadCreatorJobs();
       loadDashboard();
     } else if (result.needs_code) {
-      openVerifyModal(result.job.id);
-      toast("Verification code required — check email", "error");
+      toast("OTP auto-fetch fail — dubara try karo ya thodi der baad", "error");
     } else {
       toast(result.error || "Creation failed", "error");
     }

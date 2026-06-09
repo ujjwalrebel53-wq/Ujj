@@ -162,6 +162,7 @@ function routeApi(string $method, string $uri): void
         Response::json(AccountCreator::previewProfiles($count, $prefix));
     }
     if ($uri === '/api/creator/create' && $method === 'POST') {
+        set_time_limit(300);
         $result = AccountCreator::startSingle(Response::body());
         Response::json($result, !empty($result['success']) ? 201 : 400);
     }

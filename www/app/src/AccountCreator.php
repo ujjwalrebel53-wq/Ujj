@@ -84,38 +84,32 @@ final class AccountCreator
         ?string $email = null,
         ?string $verificationCode = null
     ): array {
-        $tempMail = null;
-        if (!$email) {
-            $tempMail = new TempEmail();
-            $email = $tempMail->address;
-        }
-
-        $code = $verificationCode ?: self::getVerificationCode($jobId);
-        if (!$code && $tempMail) {
-            try {
-                $code = $tempMail->waitForCode(90);
-            } catch (Throwable) {
-                Database::updateCreationJob($jobId, ['status' => 'waiting_code']);
-                throw new RuntimeException('Verification code required', 1001);
-            }
-        }
-
+        // Email khali = Python bridge khud temp mail banayega + OTP auto fetch karega
+        // OTP Instagram email bhejne KE BAAD aata hai — isliye PHP se pehle mat mango
         $year = random_int(1994, 2002);
         $month = random_int(1, 12);
         $day = random_int(1, 28);
 
         $proxy = ProxyManager::resolveProxy($proxy);
-        $result = InstagramBridge::call('signup', [
+        $bridgeParams = [
             'username' => $username,
             'password' => $password,
-            'email' => $email,
             'full_name' => $fullName,
             'proxy' => $proxy,
             'year' => $year,
             'month' => $month,
             'day' => $day,
-            'verification_code' => $code,
-        ]);
+            'auto_email' => true,
+        ];
+        if ($email) {
+            $bridgeParams['email'] = $email;
+        }
+        $manualCode = $verificationCode ?: self::getVerificationCode($jobId);
+        if ($manualCode) {
+            $bridgeParams['verification_code'] = $manualCode;
+        }
+
+        $result = InstagramBridge::call('signup', $bridgeParams);
 
         if (empty($result['success'])) {
             if (!empty($result['needs_code'])) {
@@ -125,12 +119,13 @@ final class AccountCreator
             throw new RuntimeException($result['error'] ?? 'Signup failed');
         }
 
+        $usedEmail = $result['data']['email'] ?? $email ?? '';
         $account = Database::createAccount([
             'username' => $result['data']['username'] ?? $username,
             'password_enc' => Crypto::encrypt($password),
             'proxy' => $proxy,
             'group_name' => $groupName,
-            'notes' => "Auto-created | $email",
+            'notes' => "Auto-created | $usedEmail",
             'status' => 'active',
         ]);
         Database::updateAccount($account['id'], [
@@ -146,7 +141,7 @@ final class AccountCreator
             'account' => $account,
             'username' => $result['data']['username'] ?? $username,
             'password' => $password,
-            'email' => $email,
+            'email' => $usedEmail,
             'full_name' => $fullName,
         ];
     }
