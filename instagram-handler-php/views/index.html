@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IG Handler — Multi Instagram Account Manager</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">📸</div>
+        <span>IG Handler</span>
+      </div>
+      <button class="nav-item active" data-page="dashboard">📊 Dashboard</button>
+      <button class="nav-item" data-page="accounts">👥 Accounts</button>
+      <button class="nav-item" data-page="creator">🤖 Account Creator</button>
+      <button class="nav-item" data-page="activity">📋 Activity Log</button>
+    </aside>
+
+    <main class="main">
+      <!-- Dashboard -->
+      <section id="page-dashboard" class="page active">
+        <div class="page-header">
+          <div>
+            <h1>Dashboard</h1>
+            <p>Manage all your Instagram accounts from one place</p>
+          </div>
+          <button class="btn btn-primary" onclick="openAddModal()">+ Add Account</button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Accounts</div>
+            <div class="stat-value accent" id="stat-total">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Active Sessions</div>
+            <div class="stat-value" id="stat-active" style="color:var(--success)">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Errors</div>
+            <div class="stat-value" id="stat-error" style="color:var(--error)">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Scheduled Posts</div>
+            <div class="stat-value" id="stat-pending">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Auto-Created</div>
+            <div class="stat-value" id="stat-created" style="color:var(--accent3)">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Creating Now</div>
+            <div class="stat-value" id="stat-creating">0</div>
+          </div>
+        </div>
+        <div class="page-header" style="margin-top:8px">
+          <h2 style="font-size:1.2rem">Quick Actions</h2>
+        </div>
+        <div class="toolbar">
+          <button class="btn btn-primary" onclick="switchPage('accounts'); openAddModal()">+ Add Account</button>
+          <button class="btn btn-secondary" onclick="switchPage('accounts')">View All Accounts</button>
+          <button class="btn btn-secondary" onclick="switchPage('creator')">Auto Create Accounts</button>
+          <button class="btn btn-secondary" onclick="exportData()">Export Data</button>
+        </div>
+      </section>
+
+      <!-- Account Creator -->
+      <section id="page-creator" class="page">
+        <div class="page-header">
+          <div>
+            <h1>Account Creator</h1>
+            <p>Automatically create Instagram accounts with temp email verification</p>
+          </div>
+        </div>
+
+        <div class="creator-panels">
+          <div class="creator-panel">
+            <h3>Create Single Account</h3>
+            <form id="creator-single-form" onsubmit="submitCreatorSingle(event)">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Username Prefix (optional)</label>
+                  <input name="username_prefix" placeholder="mybrand">
+                </div>
+                <div class="form-group">
+                  <label>Group</label>
+                  <input name="group_name" value="auto-created">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Proxy (optional)</label>
+                <input name="proxy" placeholder="http://user:pass@host:port">
+              </div>
+              <div class="form-group">
+                <label>Custom Email (optional — uses temp email if empty)</label>
+                <input name="email" type="email" placeholder="auto temp email will be used">
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Custom Username (optional)</label>
+                  <input name="username" placeholder="auto-generated">
+                </div>
+                <div class="form-group">
+                  <label>Custom Password (optional)</label>
+                  <input name="password" placeholder="auto-generated">
+                </div>
+              </div>
+              <div class="toolbar" style="margin:0">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="previewProfiles()">Preview Profiles</button>
+                <button type="submit" class="btn btn-primary">Create Account</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="creator-panel">
+            <h3>Batch Create</h3>
+            <form id="creator-batch-form" onsubmit="submitCreatorBatch(event)">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Number of Accounts</label>
+                  <input name="count" type="number" min="1" max="20" value="3" required>
+                </div>
+                <div class="form-group">
+                  <label>Delay Between (seconds)</label>
+                  <input name="delay_seconds" type="number" min="10" value="30" required>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Username Prefix</label>
+                  <input name="username_prefix" placeholder="auto">
+                </div>
+                <div class="form-group">
+                  <label>Group</label>
+                  <input name="group_name" value="auto-created">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Proxy (optional — same for all)</label>
+                <input name="proxy" placeholder="http://user:pass@host:port">
+              </div>
+              <button type="submit" class="btn btn-primary">Start Batch Creation</button>
+            </form>
+          </div>
+        </div>
+
+        <div id="preview-box" class="preview-box" style="display:none">
+          <h3>Profile Preview</h3>
+          <div id="preview-list"></div>
+        </div>
+
+        <div class="page-header" style="margin-top:28px">
+          <h2 style="font-size:1.2rem">Creation Jobs</h2>
+          <button class="btn btn-secondary btn-sm" onclick="loadCreatorJobs()">Refresh</button>
+        </div>
+        <div id="creator-jobs" class="jobs-list"></div>
+      </section>
+
+      <!-- Accounts -->
+      <section id="page-accounts" class="page">
+        <div class="page-header">
+          <div>
+            <h1>Accounts</h1>
+            <p>Add, login, and manage multiple Instagram accounts</p>
+          </div>
+          <button class="btn btn-primary" onclick="openAddModal()">+ Add Account</button>
+        </div>
+        <div class="toolbar">
+          <input type="text" id="search-accounts" class="search-box" placeholder="Search accounts...">
+          <select id="filter-group" class="filter-select">
+            <option value="">All Groups</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="selectAll()">Select All</button>
+          <button class="btn btn-secondary btn-sm" onclick="deselectAll()">Deselect</button>
+          <button class="btn btn-primary btn-sm" onclick="bulkLogin()">Bulk Login</button>
+          <button class="btn btn-secondary btn-sm" onclick="bulkRefresh()">Bulk Refresh</button>
+        </div>
+        <div id="accounts-grid" class="accounts-grid"></div>
+      </section>
+
+      <!-- Activity -->
+      <section id="page-activity" class="page">
+        <div class="page-header">
+          <div>
+            <h1>Activity Log</h1>
+            <p>Recent actions across all accounts</p>
+          </div>
+        </div>
+        <div id="activity-list" class="activity-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Add Account Modal -->
+  <div id="add-modal" class="modal-overlay" onclick="if(event.target===this)closeModal('add-modal')">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Add Instagram Account</h2>
+        <button class="modal-close" onclick="closeModal('add-modal')">&times;</button>
+      </div>
+      <form id="add-form" class="modal-body" onsubmit="submitAdd(event)">
+        <div class="form-group">
+          <label>Username</label>
+          <input name="username" required placeholder="@username">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input name="password" type="password" placeholder="Instagram password">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Group</label>
+            <input name="group_name" placeholder="default" value="default">
+          </div>
+          <div class="form-group">
+            <label>Proxy (optional)</label>
+            <input name="proxy" placeholder="http://user:pass@host:port">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea name="notes" rows="2" placeholder="Any notes about this account..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('add-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Account Modal -->
+  <div id="edit-modal" class="modal-overlay" onclick="if(event.target===this)closeModal('edit-modal')">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Edit Account</h2>
+        <button class="modal-close" onclick="closeModal('edit-modal')">&times;</button>
+      </div>
+      <form id="edit-form" class="modal-body" onsubmit="submitEdit(event)">
+        <input type="hidden" id="edit-id">
+        <div class="form-group">
+          <label>Username</label>
+          <input id="edit-username" disabled>
+        </div>
+        <div class="form-group">
+          <label>New Password (leave blank to keep)</label>
+          <input id="edit-password" type="password">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Group</label>
+            <input id="edit-group">
+          </div>
+          <div class="form-group">
+            <label>Proxy</label>
+            <input id="edit-proxy" placeholder="http://user:pass@host:port">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="edit-notes" rows="2"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('edit-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Post Modal -->
+  <div id="post-modal" class="modal-overlay" onclick="if(event.target===this)closeModal('post-modal')">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Post Photo</h2>
+        <button class="modal-close" onclick="closeModal('post-modal')">&times;</button>
+      </div>
+      <form id="post-form" class="modal-body" onsubmit="submitPost(event)" enctype="multipart/form-data">
+        <input type="hidden" name="account_id" id="post-account-id">
+        <div class="form-group">
+          <label>Photo</label>
+          <input type="file" name="media" accept="image/*" required>
+        </div>
+        <div class="form-group">
+          <label>Caption</label>
+          <textarea name="caption" rows="4" placeholder="Write a caption..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('post-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Post Now</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Verify Code Modal -->
+  <div id="verify-modal" class="modal-overlay" onclick="if(event.target===this)closeModal('verify-modal')">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Enter Verification Code</h2>
+        <button class="modal-close" onclick="closeModal('verify-modal')">&times;</button>
+      </div>
+      <form class="modal-body" onsubmit="submitVerifyCode(event)">
+        <input type="hidden" id="verify-job-id">
+        <p style="color:var(--muted);margin-bottom:16px;font-size:0.9rem">
+          Instagram ne email par verification code bheja hai. Code enter karo.
+        </p>
+        <div class="form-group">
+          <label>6-Digit Code</label>
+          <input id="verify-code" required pattern="[0-9]{6}" maxlength="6" placeholder="123456">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('verify-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Verify & Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Success Credentials Modal -->
+  <div id="creds-modal" class="modal-overlay" onclick="if(event.target===this)closeModal('creds-modal')">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Account Created!</h2>
+        <button class="modal-close" onclick="closeModal('creds-modal')">&times;</button>
+      </div>
+      <div class="modal-body" id="creds-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closeModal('creds-modal')">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts" class="toast-container"></div>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
