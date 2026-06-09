@@ -35,6 +35,11 @@ def plog(level: str, message: str, **ctx):
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
+def is_rate_limited(err) -> bool:
+    s = str(err).lower()
+    return "429" in s or "too many" in s or "rate limit" in s or "please wait" in s
+
+
 class TempMail:
     def __init__(self):
         self.provider = "mailtm"
@@ -143,20 +148,110 @@ class TempMail:
                 if m:
                     plog("SUCCESS", f"OTP mil gaya: {m.group(1)}", email=self.address)
                     return m.group(1)
-            plog("DEBUG", "OTP abhi nahi aaya, 5s wait...")
             time.sleep(5)
-        plog("ERROR", "OTP timeout — email mein code nahi aaya", email=self.address)
+        plog("ERROR", "OTP timeout", email=self.address)
         raise RuntimeError("OTP not received from temp email")
 
 
 def build_client(proxy: str = "") -> Client:
     client = Client()
-    client.delay_range = [2, 5]
+    client.delay_range = [10, 25]
+    client.request_timeout = 30
     if proxy:
         client.set_proxy(proxy)
+        plog("DEBUG", "Proxy set", proxy=proxy[:40] + "...")
+    else:
+        plog("WARN", "Bina proxy — 429 ka risk zyada hai!")
     client.set_uuids({})
     client.device_id = client.android_device_id
     return client
+
+
+def _do_signup(params: dict, proxy: str) -> dict:
+    username = params["username"]
+    full_name = params.get("full_name", "")
+
+    pre_wait = random.randint(20, 50)
+    plog("INFO", f"Anti-rate-limit wait {pre_wait}s (Instagram 429 se bachne ke liye)...")
+    time.sleep(pre_wait)
+
+    client = build_client(proxy)
+
+    temp_mail = None
+    email = (params.get("email") or "").strip()
+
+    if not email:
+        plog("INFO", "Temp email bana rahe hain...")
+        temp_mail = TempMail()
+        email = temp_mail.address
+        plog("SUCCESS", f"Temp email: {email}", provider=temp_mail.provider)
+    else:
+        plog("INFO", f"Email use: {email}")
+
+    preset_code = (params.get("verification_code") or "").strip()
+
+    def code_handler(u, choice):
+        if preset_code:
+            return preset_code
+        if temp_mail:
+            plog("INFO", "Instagram ne email bheji, OTP auto fetch...")
+            return temp_mail.wait_for_code(120)
+        return ""
+
+    client.challenge_code_handler = code_handler
+
+    plog("INFO", "Instagram signup API call...")
+    user = client.signup(
+        username=username,
+        password=params["password"],
+        email=email,
+        phone_number="",
+        full_name=full_name,
+        year=params.get("year"),
+        month=params.get("month"),
+        day=params.get("day"),
+    )
+    plog("SUCCESS", f"Account ban gaya: @{user.username or username}", email=email)
+    return {
+        "username": user.username or username,
+        "full_name": full_name,
+        "email": email,
+    }
+
+
+def action_signup(params: dict) -> dict:
+    username = params["username"]
+    plog("INFO", f"Signup shuru: @{username}", name=params.get("full_name", ""))
+
+    proxy_list = params.get("proxy_list") or []
+    primary = (params.get("proxy") or "").strip()
+    if primary and primary not in proxy_list:
+        proxy_list.insert(0, primary)
+    if not proxy_list:
+        proxy_list = [primary] if primary else [""]
+
+    last_err = None
+    max_attempts = min(len(proxy_list), 5)
+
+    for attempt in range(max_attempts):
+        proxy = proxy_list[attempt % len(proxy_list)]
+        if attempt > 0:
+            wait = 45 * attempt + random.randint(15, 30)
+            plog("WARN", f"429 retry #{attempt} — {wait}s wait + naya proxy", attempt=attempt)
+            time.sleep(wait)
+
+        try:
+            return _do_signup(params, proxy)
+        except (PleaseWaitFewMinutes, Exception) as exc:
+            last_err = exc
+            if is_rate_limited(exc):
+                plog("ERROR", f"429 rate limit attempt {attempt + 1}/{max_attempts}: {exc}")
+                continue
+            raise
+
+    msg = f"Instagram rate limit (429) — {max_attempts} proxies try kiye. 30-60 min wait karo ya naya proxy use karo. Last: {last_err}"
+    plog("ERROR", msg)
+    raise RuntimeError(msg)
 
 
 def action_login(params: dict) -> dict:
@@ -194,56 +289,6 @@ def action_login(params: dict) -> dict:
     }
 
 
-def action_signup(params: dict) -> dict:
-    username = params["username"]
-    full_name = params.get("full_name", "")
-    plog("INFO", f"Signup shuru: @{username}", name=full_name)
-
-    client = build_client(params.get("proxy", ""))
-    plog("DEBUG", "Instagram client ready, device_id set")
-
-    temp_mail = None
-    email = (params.get("email") or "").strip()
-
-    if not email:
-        plog("INFO", "Temp email bana rahe hain...")
-        temp_mail = TempMail()
-        email = temp_mail.address
-        plog("SUCCESS", f"Temp email: {email}", provider=temp_mail.provider)
-    else:
-        plog("INFO", f"Email use: {email}")
-
-    preset_code = (params.get("verification_code") or "").strip()
-
-    def code_handler(u, choice):
-        if preset_code:
-            return preset_code
-        if temp_mail:
-            plog("INFO", "Instagram ne email bheji, OTP fetch kar rahe hain...")
-            return temp_mail.wait_for_code(120)
-        return ""
-
-    client.challenge_code_handler = code_handler
-
-    plog("INFO", "Instagram API signup call...")
-    user = client.signup(
-        username=params["username"],
-        password=params["password"],
-        email=email,
-        phone_number="",
-        full_name=params.get("full_name", ""),
-        year=params.get("year"),
-        month=params.get("month"),
-        day=params.get("day"),
-    )
-    plog("SUCCESS", f"Account ban gaya: @{user.username or username}", email=email)
-    return {
-        "username": user.username or params["username"],
-        "full_name": params.get("full_name", ""),
-        "email": email,
-    }
-
-
 def action_post_photo(params: dict) -> dict:
     client = build_client(params.get("proxy", ""))
     session_path = params.get("session_path", "")
@@ -273,12 +318,13 @@ def main() -> None:
     except ChallengeRequired as exc:
         print(json.dumps({"success": False, "error": "Challenge required: " + str(exc), "needs_code": True}))
     except PleaseWaitFewMinutes as exc:
-        print(json.dumps({"success": False, "error": f"Rate limited: {exc}"}))
+        print(json.dumps({"success": False, "error": f"Rate limited: {exc}", "rate_limited": True}))
     except (LoginRequired, ClientError, AssertionError, Exception) as exc:
         msg = str(exc)
         plog("ERROR", f"Bridge error [{action}]: {msg}")
+        rate_limited = is_rate_limited(exc)
         needs_code = "code" in msg.lower() or "verification" in msg.lower() or "otp" in msg.lower()
-        print(json.dumps({"success": False, "error": msg, "needs_code": needs_code}))
+        print(json.dumps({"success": False, "error": msg, "needs_code": needs_code, "rate_limited": rate_limited}))
 
 
 if __name__ == "__main__":

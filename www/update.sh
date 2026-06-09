@@ -7,6 +7,7 @@ echo "==> Updating RebelInsta..."
 
 wget -q -O python-bridge/ig_bridge.py     "$BASE/python-bridge/ig_bridge.py"
 wget -q -O app/src/AccountCreator.php      "$BASE/app/src/AccountCreator.php"
+wget -q -O app/src/ProxyManager.php         "$BASE/app/src/ProxyManager.php"
 wget -q -O app/src/InstagramBridge.php     "$BASE/app/src/InstagramBridge.php"
 wget -q -O app/src/LiveLogger.php          "$BASE/app/src/LiveLogger.php"
 wget -q -O app/src/routes.php               "$BASE/app/src/routes.php"

@@ -77,6 +77,11 @@
         </div>
 
         <div id="proxy-status" class="proxy-status"></div>
+        <div class="rate-limit-notice">
+          <strong>429 / Rate Limit?</strong>
+          Instagram bahut requests block karta hai. Webshare proxy ON rakho, batch delay kam se kam <strong>90 sec</strong> rakho,
+          aur error ke baad <strong>30–60 min</strong> wait karo. Live Logs mein "Proxy pool ready" dikhna chahiye.
+        </div>
         <div class="creator-panels">
           <div class="creator-panel">
             <h3>Create Single Account</h3>
@@ -129,7 +134,7 @@
                 </div>
                 <div class="form-group">
                   <label>Delay Between (seconds)</label>
-                  <input name="delay_seconds" type="number" min="10" value="30" required>
+                  <input name="delay_seconds" type="number" min="60" value="90" required>
                 </div>
               </div>
               <div class="form-row">

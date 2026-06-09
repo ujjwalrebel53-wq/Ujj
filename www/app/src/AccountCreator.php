@@ -92,14 +92,22 @@ final class AccountCreator
         $month = random_int(1, 12);
         $day = random_int(1, 28);
         $proxy = ProxyManager::resolveProxy($proxy);
-
-        LiveLogger::debug('Proxy assign hua', ['proxy' => $proxy ? 'yes' : 'no']);
+        $proxyPool = ProxyManager::getProxyPool(5);
+        if ($proxy && !in_array($proxy, $proxyPool, true)) {
+            array_unshift($proxyPool, $proxy);
+        }
+        if (!$proxy && empty($proxyPool)) {
+            LiveLogger::warn('PROXY NAHI HAI — 429 error aayega! Webshare URL check karo .env mein');
+        } else {
+            LiveLogger::info('Proxy pool ready', ['count' => count($proxyPool)]);
+        }
 
         $bridgeParams = [
             'username' => $username,
             'password' => $password,
             'full_name' => $fullName,
-            'proxy' => $proxy,
+            'proxy' => $proxy ?: ($proxyPool[0] ?? ''),
+            'proxy_list' => $proxyPool,
             'year' => $year,
             'month' => $month,
             'day' => $day,
@@ -122,6 +130,9 @@ final class AccountCreator
 
         if (empty($result['success'])) {
             $err = $result['error'] ?? 'Signup failed';
+            if (!empty($result['rate_limited'])) {
+                $err = 'Instagram rate limit (429) — 30-60 min wait karo, phir dubara try. Alag proxy use karo.';
+            }
             LiveLogger::error('Signup fail: ' . $err, ['job_id' => $jobId]);
             if (!empty($result['needs_code'])) {
                 Database::updateCreationJob($jobId, ['status' => 'waiting_code', 'error' => $err]);
@@ -223,7 +234,9 @@ final class AccountCreator
                 'job_batch_id' => $batchId,
             ]);
         }
-        self::startWorker((int) ($data['delay_seconds'] ?? 30));
+        $delay = max((int) ($data['delay_seconds'] ?? 90), 60);
+        LiveLogger::info("Batch delay: {$delay}s per account (429 avoid)");
+        self::startWorker($delay);
         return ['batch_id' => $batchId, 'count' => $count, 'jobs' => $jobs];
     }
 
@@ -231,7 +244,7 @@ final class AccountCreator
     {
         $php = PHP_BINARY;
         $script = BASE_PATH . '/cli/worker.php';
-        $delay = max($delay, 10);
+        $delay = max($delay, 60);
         LiveLogger::info("Background worker start (delay {$delay}s)");
         if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
             pclose(popen("start /B \"\" $php " . escapeshellarg($script) . ' ' . $delay, 'r'));

@@ -436,8 +436,12 @@ async function loadProxyStatus() {
       el.innerHTML = '<span class="proxy-info">Webshare proxy URL set nahi hai (.env mein WEBSHARE_PROXY_URL)</span>';
       return;
     }
+    const low = stats.total_proxies < 3;
     el.innerHTML = `
-      <span class="proxy-info">Webshare Proxy Pool: <span class="proxy-count">${stats.total_proxies}</span> proxies loaded</span>
+      <span class="proxy-info">
+        Webshare Proxy Pool: <span class="proxy-count">${stats.total_proxies}</span> proxies loaded
+        ${low ? '<span style="color:var(--error)"> — kam proxies, 429 risk zyada</span>' : ''}
+      </span>
       <button class="btn btn-secondary btn-sm" onclick="refreshProxies()">Refresh Proxies</button>`;
   } catch (e) {
     el.innerHTML = `<span class="proxy-info" style="color:var(--error)">${esc(e.message)}</span>`;
@@ -521,9 +525,10 @@ async function submitCreatorSingle(e) {
 async function submitCreatorBatch(e) {
   e.preventDefault();
   const form = e.target;
+  const delay = Math.max(parseInt(form.delay_seconds.value, 10) || 90, 60);
   const data = {
     count: parseInt(form.count.value, 10),
-    delay_seconds: parseInt(form.delay_seconds.value, 10),
+    delay_seconds: delay,
     username_prefix: form.username_prefix.value,
     group_name: form.group_name.value || "auto-created",
     proxy: form.proxy.value,

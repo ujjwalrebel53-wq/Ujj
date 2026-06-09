@@ -101,6 +101,17 @@ final class ProxyManager
         return $proxies[array_rand($proxies)];
     }
 
+    /** @return string[] Unique random proxies for 429 retry */
+    public static function getProxyPool(int $count = 5): array
+    {
+        $all = self::fetchProxies();
+        if (!$all) {
+            return [];
+        }
+        shuffle($all);
+        return array_slice(array_values(array_unique($all)), 0, min($count, count($all)));
+    }
+
     public static function resolveProxy(string $explicit = '', bool $auto = true): string
     {
         $explicit = trim($explicit);
@@ -108,7 +119,7 @@ final class ProxyManager
             return $explicit;
         }
         if ($auto && self::getProxyUrl() !== '') {
-            return self::getNextProxy();
+            return self::getRandomProxy();
         }
         return '';
     }
