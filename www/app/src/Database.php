@@ -13,6 +13,8 @@ final class Database
             self::$pdo = new PDO('sqlite:' . $path);
             self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             self::$pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            self::$pdo->exec('PRAGMA busy_timeout = 5000');
+            self::$pdo->exec('PRAGMA journal_mode = WAL');
         }
         return self::$pdo;
     }
@@ -289,6 +291,50 @@ final class Database
     public static function listPendingCreationJobs(): array
     {
         return self::pdo()->query("SELECT * FROM creation_jobs WHERE status = 'pending' ORDER BY id ASC")->fetchAll();
+    }
+
+    public static function claimNextPendingJob(): ?array
+    {
+        $pdo = self::pdo();
+        $pdo->beginTransaction();
+        try {
+            $job = $pdo->query("SELECT * FROM creation_jobs WHERE status = 'pending' ORDER BY id ASC LIMIT 1")->fetch();
+            if (!$job) {
+                $pdo->commit();
+                return null;
+            }
+            $stmt = $pdo->prepare("UPDATE creation_jobs SET status = 'creating', updated_at = ? WHERE id = ? AND status = 'pending'");
+            $stmt->execute([self::now(), $job['id']]);
+            if ($stmt->rowCount() === 0) {
+                $pdo->rollBack();
+                return null;
+            }
+            $pdo->commit();
+            return self::getCreationJob((int) $job['id']);
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    public static function resetStuckCreationJobs(int $minutes = 20): int
+    {
+        $cutoff = gmdate('c', time() - ($minutes * 60));
+        $stmt = self::pdo()->prepare(
+            "UPDATE creation_jobs SET status = 'failed', error = 'Server timeout — dubara Retry dabao', updated_at = ?
+             WHERE status = 'creating' AND updated_at < ?"
+        );
+        $stmt->execute([self::now(), $cutoff]);
+        return $stmt->rowCount();
+    }
+
+    public static function countActiveCreationJobs(): int
+    {
+        return (int) self::pdo()->query(
+            "SELECT COUNT(*) FROM creation_jobs WHERE status IN ('pending','creating','waiting_code')"
+        )->fetchColumn();
     }
 
     public static function exportAccounts(): string

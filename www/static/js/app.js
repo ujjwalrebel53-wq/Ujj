@@ -4,6 +4,7 @@ let selectedIds = new Set();
 let currentPage = "dashboard";
 let creatorPollTimer = null;
 let logsEventSource = null;
+let activeJobPoll = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   initNav();
@@ -417,7 +418,7 @@ function startCreatorPolling() {
   stopCreatorPolling();
   creatorPollTimer = setInterval(() => {
     if (currentPage === "creator") loadCreatorJobs(true);
-  }, 5000);
+  }, 6000);
 }
 
 function stopCreatorPolling() {
@@ -486,6 +487,87 @@ async function previewProfiles() {
   }
 }
 
+function showCreateProgress(title, msg) {
+  const el = document.getElementById("create-progress");
+  if (!el) return;
+  el.hidden = false;
+  document.getElementById("create-progress-title").textContent = title || "Account ban raha hai...";
+  document.getElementById("create-progress-msg").textContent = msg || "Queue mein... 2-5 min lag sakta hai";
+  document.getElementById("create-progress-fill").style.width = "12%";
+}
+
+function hideCreateProgress() {
+  const el = document.getElementById("create-progress");
+  if (el) el.hidden = true;
+  if (activeJobPoll) {
+    clearInterval(activeJobPoll);
+    activeJobPoll = null;
+  }
+}
+
+function updateCreateProgress(pct, msg) {
+  const fill = document.getElementById("create-progress-fill");
+  const msgEl = document.getElementById("create-progress-msg");
+  if (fill) fill.style.width = `${pct}%`;
+  if (msgEl && msg) msgEl.textContent = msg;
+}
+
+async function pollJobUntilDone(jobId) {
+  hideCreateProgress();
+  showCreateProgress("Account ban raha hai...", "Queue mein add ho raha hai...");
+  let ticks = 0;
+  const start = Date.now();
+
+  const poll = async () => {
+    ticks += 1;
+    try {
+      const job = await api(`/api/creator/jobs/${jobId}`);
+      const elapsed = Math.floor((Date.now() - start) / 1000);
+      if (job.status === "pending") {
+        updateCreateProgress(22, `Queue mein... (${elapsed}s) — server worker start ho raha hai`);
+        if (ticks % 2 === 0) api("/api/creator/nudge", { method: "POST" }).catch(() => {});
+      } else if (job.status === "creating") {
+        const pct = Math.min(88, 35 + Math.floor(elapsed / 2));
+        updateCreateProgress(pct, `Instagram signup + OTP... (${elapsed}s) — 2-5 min normal hai, page band mat karo`);
+      } else if (job.status === "success") {
+        updateCreateProgress(100, "Account ban gaya!");
+        setTimeout(hideCreateProgress, 600);
+        showCredentials(job);
+        toast("Account created successfully!");
+        loadCreatorJobs();
+        loadDashboard();
+        return true;
+      } else if (job.status === "waiting_code") {
+        hideCreateProgress();
+        openVerifyModal(jobId);
+        toast("OTP manually enter karo", "error");
+        loadCreatorJobs();
+        return true;
+      } else if (job.status === "failed") {
+        hideCreateProgress();
+        toast(job.error || "Creation failed", "error");
+        loadCreatorJobs();
+        return true;
+      }
+    } catch (err) {
+      if (ticks > 8) {
+        hideCreateProgress();
+        toast(err.message, "error");
+        return true;
+      }
+    }
+    return false;
+  };
+
+  if (await poll()) return;
+  activeJobPoll = setInterval(async () => {
+    if (await poll()) {
+      clearInterval(activeJobPoll);
+      activeJobPoll = null;
+    }
+  }, 4000);
+}
+
 async function submitCreatorSingle(e) {
   e.preventDefault();
   const form = e.target;
@@ -498,27 +580,13 @@ async function submitCreatorSingle(e) {
     username: form.username.value,
     password: form.password.value,
   };
-  toast("Creating account... this may take 1-2 minutes");
   try {
-    const res = await fetch("/api/creator/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    const result = await res.json();
-    if (result.success) {
-      showCredentials(result);
-      toast("Account created successfully!");
-      loadCreatorJobs();
-      loadDashboard();
-    } else if (result.needs_code) {
-      toast("OTP auto-fetch fail — dubara try karo ya thodi der baad", "error");
-    } else {
-      toast(result.error || "Creation failed", "error");
-    }
+    const result = await api("/api/creator/create", { method: "POST", body: JSON.stringify(data) });
+    toast("Queue mein add ho gaya — progress dikhega");
     loadCreatorJobs();
-  } catch (e) {
-    toast(e.message, "error");
+    if (result.job_id) pollJobUntilDone(result.job_id);
+  } catch (err) {
+    toast(err.message, "error");
   }
 }
 
@@ -551,6 +619,10 @@ async function loadCreatorJobs(silent = false) {
   if (!silent) container.innerHTML = '<div class="loading" style="margin:20px auto"></div>';
   try {
     const jobs = await api("/api/creator/jobs?limit=30");
+    const hasPending = jobs.some((j) => j.status === "pending");
+    if (hasPending) {
+      api("/api/creator/nudge", { method: "POST" }).catch(() => {});
+    }
     if (!jobs.length) {
       container.innerHTML = '<div class="empty-state"><p>No creation jobs yet</p></div>';
       return;
@@ -572,8 +644,15 @@ async function loadCreatorJobs(silent = false) {
               : j.status === "success"
                 ? `<button class="btn btn-sm btn-secondary" onclick="showJobCredentials(${j.id})">Show Creds</button>`
                 : "";
+        const active = j.status === "pending" || j.status === "creating";
+        const progress =
+          j.status === "pending"
+            ? '<div class="job-progress">⏳ Queue mein — worker start ho raha hai...</div>'
+            : j.status === "creating"
+              ? '<div class="job-progress">🔄 Instagram signup chal raha hai (2-5 min)...</div>'
+              : "";
         return `
-      <div class="job-card">
+      <div class="job-card${active ? " job-active" : ""}">
         <div class="job-header">
           <strong>@${esc(j.username)}</strong>
           <span class="status-badge status-${statusClass[j.status] || "inactive"}">${j.status}</span>
@@ -584,6 +663,7 @@ async function loadCreatorJobs(silent = false) {
           <span>📁 ${esc(j.group_name)}</span>
           <span>${new Date(j.created_at).toLocaleString()}</span>
         </div>
+        ${progress}
         ${j.error ? `<p class="job-error">${esc(j.error)}</p>` : ""}
         <div class="account-actions">${actions}</div>
       </div>`;
@@ -602,42 +682,30 @@ function openVerifyModal(jobId) {
 
 async function submitVerifyCode(e) {
   e.preventDefault();
-  const jobId = document.getElementById("verify-job-id").value;
+  const jobId = parseInt(document.getElementById("verify-job-id").value, 10);
   const code = document.getElementById("verify-code").value;
   try {
-    const result = await api(`/api/creator/jobs/${jobId}/verify`, {
+    await api(`/api/creator/jobs/${jobId}/verify`, {
       method: "POST",
       body: JSON.stringify({ code }),
     });
     closeModal("verify-modal");
-    if (result.success) {
-      showCredentials(result);
-      toast("Account created!");
-    } else {
-      toast(result.error || "Verification failed", "error");
-    }
+    toast("Verify queue mein — progress dikhega");
     loadCreatorJobs();
-    loadDashboard();
-  } catch (e) {
-    toast(e.message, "error");
+    pollJobUntilDone(jobId);
+  } catch (err) {
+    toast(err.message, "error");
   }
 }
 
 async function retryJob(jobId) {
-  toast("Retrying...");
+  toast("Retry queue mein...");
   try {
-    const result = await api(`/api/creator/jobs/${jobId}/retry`, { method: "POST" });
-    if (result.success) {
-      showCredentials(result);
-      toast("Account created!");
-    } else if (result.needs_code) {
-      openVerifyModal(jobId);
-    } else {
-      toast(result.error || "Retry failed", "error");
-    }
+    await api(`/api/creator/jobs/${jobId}/retry`, { method: "POST" });
     loadCreatorJobs();
-  } catch (e) {
-    toast(e.message, "error");
+    pollJobUntilDone(jobId);
+  } catch (err) {
+    toast(err.message, "error");
   }
 }
 

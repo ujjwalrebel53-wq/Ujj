@@ -171,7 +171,7 @@ final class AccountCreator
 
     public static function startSingle(array $data): array
     {
-        LiveLogger::info('Single account creation request');
+        LiveLogger::info('Single account creation queued (async)');
         $jobProxy = ProxyManager::resolveProxy($data['proxy'] ?? '', (bool) ($data['use_webshare'] ?? true));
         $job = Database::createCreationJob([
             'username' => $data['username'] ?? self::generateUsername($data['username_prefix'] ?? ''),
@@ -182,38 +182,16 @@ final class AccountCreator
             'email' => $data['email'] ?? '',
             'job_batch_id' => 'single',
         ]);
-        Database::updateCreationJob($job['id'], ['status' => 'creating']);
-
-        try {
-            $result = self::createInstagramAccount(
-                (int) $job['id'],
-                $job['username'],
-                $job['password'],
-                $job['full_name'],
-                $job['proxy'],
-                $job['group_name'],
-                $job['email'] ?: null,
-                $data['verification_code'] ?? null
-            );
-            Database::updateCreationJob($job['id'], [
-                'status' => 'success',
-                'account_id' => $result['account']['id'],
-                'email' => $result['email'],
-            ]);
-            return array_merge(['job' => Database::getCreationJob($job['id'])], $result);
-        } catch (RuntimeException $e) {
-            $needsCode = $e->getCode() === 1001;
-            Database::updateCreationJob($job['id'], [
-                'status' => $needsCode ? 'waiting_code' : 'failed',
-                'error' => $e->getMessage(),
-            ]);
-            return [
-                'job' => Database::getCreationJob($job['id']),
-                'success' => false,
-                'error' => $e->getMessage(),
-                'needs_code' => $needsCode,
-            ];
+        if (!empty($data['verification_code'])) {
+            self::submitVerificationCode((int) $job['id'], (string) $data['verification_code']);
         }
+        self::triggerWorker(90);
+        return [
+            'queued' => true,
+            'job_id' => (int) $job['id'],
+            'job' => $job,
+            'message' => 'Queue mein add ho gaya — neeche progress dikhega (2-5 min lag sakta hai)',
+        ];
     }
 
     public static function startBatch(array $data): array
@@ -236,70 +214,101 @@ final class AccountCreator
         }
         $delay = max((int) ($data['delay_seconds'] ?? 90), 60);
         LiveLogger::info("Batch delay: {$delay}s per account (429 avoid)");
-        self::startWorker($delay);
-        return ['batch_id' => $batchId, 'count' => $count, 'jobs' => $jobs];
+        self::triggerWorker($delay);
+        return ['batch_id' => $batchId, 'count' => $count, 'jobs' => $jobs, 'queued' => true];
     }
 
-    public static function startWorker(int $delay = 30): void
+    public static function triggerWorker(int $delay = 90): void
     {
+        $delay = max($delay, 60);
+        if (self::tryStartCliWorker($delay)) {
+            return;
+        }
+        self::scheduleInlineWorker($delay);
+    }
+
+    private static function workerLockPath(): string
+    {
+        return DATA_PATH . '/worker.lock';
+    }
+
+    private static function tryStartCliWorker(int $delay): bool
+    {
+        if (!function_exists('exec')) {
+            return false;
+        }
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+        if (in_array('exec', $disabled, true)) {
+            return false;
+        }
         $php = PHP_BINARY;
         $script = BASE_PATH . '/cli/worker.php';
-        $delay = max($delay, 60);
-        LiveLogger::info("Background worker start (delay {$delay}s)");
+        LiveLogger::info("CLI worker start (delay {$delay}s)");
         if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
             pclose(popen("start /B \"\" $php " . escapeshellarg($script) . ' ' . $delay, 'r'));
         } else {
             exec(escapeshellarg($php) . ' ' . escapeshellarg($script) . ' ' . (int) $delay . ' > /dev/null 2>&1 &');
         }
+        return true;
     }
 
-    public static function processPendingJobs(int $delay = 30): void
+    private static function scheduleInlineWorker(int $delay): void
     {
-        while ($jobs = Database::listPendingCreationJobs()) {
-            $job = $jobs[0];
-            $jobId = (int) $job['id'];
-            Database::updateCreationJob($jobId, ['status' => 'creating']);
-            try {
-                $result = self::createInstagramAccount(
-                    $jobId,
-                    $job['username'],
-                    $job['password'],
-                    $job['full_name'],
-                    $job['proxy'],
-                    $job['group_name'],
-                    $job['email'] ?: null
-                );
-                Database::updateCreationJob($jobId, [
-                    'status' => 'success',
-                    'account_id' => $result['account']['id'],
-                    'email' => $result['email'],
-                    'error' => '',
-                ]);
-            } catch (RuntimeException $e) {
-                $status = $e->getCode() === 1001 ? 'waiting_code' : 'failed';
-                Database::updateCreationJob($jobId, ['status' => $status, 'error' => $e->getMessage()]);
-            } catch (Throwable $e) {
-                LiveLogger::error('Worker error: ' . $e->getMessage(), ['job_id' => $jobId]);
-                Database::updateCreationJob($jobId, ['status' => 'failed', 'error' => $e->getMessage()]);
+        LiveLogger::info('Inline worker schedule (shared hosting fallback)');
+        register_shutdown_function(static function () use ($delay): void {
+            if (function_exists('fastcgi_finish_request')) {
+                @fastcgi_finish_request();
             }
-            sleep($delay);
+            ignore_user_abort(true);
+            @set_time_limit(600);
+            self::runWorkerLoop($delay, 1);
+        });
+    }
+
+    public static function runWorkerLoop(int $delay = 90, int $maxJobs = 0): int
+    {
+        $delay = max($delay, 60);
+        $lock = self::workerLockPath();
+        $fp = @fopen($lock, 'c');
+        if (!$fp || !flock($fp, LOCK_EX | LOCK_NB)) {
+            if ($fp) {
+                fclose($fp);
+            }
+            return 0;
         }
+        fwrite($fp, (string) getmypid());
+        fflush($fp);
+
+        $processed = 0;
+        try {
+            while ($maxJobs === 0 || $processed < $maxJobs) {
+                $done = self::processNextJob($delay, false);
+                if ($done === null) {
+                    break;
+                }
+                $processed++;
+                if ($maxJobs === 0 || $processed < $maxJobs) {
+                    sleep($delay);
+                }
+            }
+        } finally {
+            flock($fp, LOCK_UN);
+            fclose($fp);
+            @unlink($lock);
+        }
+        return $processed;
     }
 
-    public static function verifyJob(int $jobId, string $code): array
+    public static function processNextJob(int $delay = 90, bool $chain = true): ?array
     {
-        self::submitVerificationCode($jobId, $code);
-        return self::retryJob($jobId);
-    }
-
-    public static function retryJob(int $jobId): array
-    {
-        $job = Database::getCreationJob($jobId);
+        Database::resetStuckCreationJobs();
+        $job = Database::claimNextPendingJob();
         if (!$job) {
-            throw new RuntimeException('Job not found');
+            return null;
         }
-        LiveLogger::info('Job retry', ['job_id' => $jobId, 'username' => $job['username']]);
-        Database::updateCreationJob($jobId, ['status' => 'creating', 'error' => '']);
+
+        $jobId = (int) $job['id'];
+        LiveLogger::info("Worker processing job #$jobId @{$job['username']}");
         try {
             $result = self::createInstagramAccount(
                 $jobId,
@@ -314,20 +323,60 @@ final class AccountCreator
                 'status' => 'success',
                 'account_id' => $result['account']['id'],
                 'email' => $result['email'],
+                'error' => '',
             ]);
-            return array_merge(['success' => true, 'job' => Database::getCreationJob($jobId)], $result);
+            $out = array_merge(['success' => true, 'job_id' => $jobId], $result);
         } catch (RuntimeException $e) {
-            $needsCode = $e->getCode() === 1001;
-            Database::updateCreationJob($jobId, [
-                'status' => $needsCode ? 'waiting_code' : 'failed',
-                'error' => $e->getMessage(),
-            ]);
-            return [
+            $status = $e->getCode() === 1001 ? 'waiting_code' : 'failed';
+            Database::updateCreationJob($jobId, ['status' => $status, 'error' => $e->getMessage()]);
+            $out = [
                 'success' => false,
-                'job' => Database::getCreationJob($jobId),
+                'job_id' => $jobId,
                 'error' => $e->getMessage(),
-                'needs_code' => $needsCode,
+                'needs_code' => $e->getCode() === 1001,
             ];
+        } catch (Throwable $e) {
+            LiveLogger::error('Worker error: ' . $e->getMessage(), ['job_id' => $jobId]);
+            Database::updateCreationJob($jobId, ['status' => 'failed', 'error' => $e->getMessage()]);
+            $out = ['success' => false, 'job_id' => $jobId, 'error' => $e->getMessage()];
         }
+
+        if ($chain && Database::listPendingCreationJobs()) {
+            self::triggerWorker($delay);
+        }
+        return $out;
+    }
+
+    /** @deprecated Use runWorkerLoop */
+    public static function processPendingJobs(int $delay = 30): void
+    {
+        self::runWorkerLoop(max($delay, 60));
+    }
+
+    public static function verifyJob(int $jobId, string $code): array
+    {
+        self::submitVerificationCode($jobId, $code);
+        return self::queueRetry($jobId);
+    }
+
+    public static function queueRetry(int $jobId): array
+    {
+        $job = Database::getCreationJob($jobId);
+        if (!$job) {
+            throw new RuntimeException('Job not found');
+        }
+        LiveLogger::info('Job retry queued', ['job_id' => $jobId, 'username' => $job['username']]);
+        Database::updateCreationJob($jobId, ['status' => 'pending', 'error' => '']);
+        self::triggerWorker(90);
+        return [
+            'queued' => true,
+            'job_id' => $jobId,
+            'job' => Database::getCreationJob($jobId),
+        ];
+    }
+
+    public static function retryJob(int $jobId): array
+    {
+        return self::queueRetry($jobId);
     }
 }

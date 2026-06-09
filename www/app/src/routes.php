@@ -162,9 +162,23 @@ function routeApi(string $method, string $uri): void
         Response::json(AccountCreator::previewProfiles($count, $prefix));
     }
     if ($uri === '/api/creator/create' && $method === 'POST') {
-        set_time_limit(300);
         $result = AccountCreator::startSingle(Response::body());
-        Response::json($result, !empty($result['success']) ? 201 : 400);
+        Response::json($result, 202);
+    }
+    if ($uri === '/api/creator/nudge' && $method === 'POST') {
+        AccountCreator::triggerWorker(90);
+        Response::json(['ok' => true]);
+    }
+    if ($uri === '/api/creator/tick' && in_array($method, ['GET', 'POST'], true)) {
+        $secret = getenv('SECRET_KEY') ?: '';
+        $key = $_GET['key'] ?? ($_SERVER['HTTP_X_WORKER_KEY'] ?? '');
+        if ($secret !== '' && $key !== $secret) {
+            Response::error('Unauthorized', 403);
+        }
+        @set_time_limit(600);
+        $delay = max((int) ($_GET['delay'] ?? 90), 60);
+        $processed = AccountCreator::runWorkerLoop($delay, 1);
+        Response::json(['processed' => $processed]);
     }
     if ($uri === '/api/creator/batch' && $method === 'POST') {
         $data = Response::body();

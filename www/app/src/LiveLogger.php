@@ -96,7 +96,7 @@ final class LiveLogger
         $pos = is_file($file) ? filesize($file) : 0;
         $start = time();
 
-        while (time() - $start < 300) {
+        while (time() - $start < 90) {
             if (connection_aborted()) {
                 break;
             }

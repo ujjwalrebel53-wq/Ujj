@@ -80,7 +80,8 @@
         <div class="rate-limit-notice">
           <strong>429 / Rate Limit?</strong>
           Instagram bahut requests block karta hai. Webshare proxy ON rakho, batch delay kam se kam <strong>90 sec</strong> rakho,
-          aur error ke baad <strong>30–60 min</strong> wait karo. Live Logs mein "Proxy pool ready" dikhna chahiye.
+          aur error ke baad <strong>30–60 min</strong> wait karo. Agar <strong>503 Service Unavailable</strong> aaye to 5 min wait karo
+          aur dubara kholo — ab account create background mein chalega, page atkega nahi.
         </div>
         <div class="creator-panels">
           <div class="creator-panel">
@@ -359,6 +360,17 @@
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="closeModal('creds-modal')">Done</button>
       </div>
+    </div>
+  </div>
+
+  <div id="create-progress" class="create-progress" hidden>
+    <div class="create-progress-card">
+      <h3 id="create-progress-title">Account ban raha hai...</h3>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="create-progress-fill"></div>
+      </div>
+      <p id="create-progress-msg">Queue mein... 2-5 min lag sakta hai (yeh normal hai)</p>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="hideCreateProgress()">Background mein chalao</button>
     </div>
   </div>
 
