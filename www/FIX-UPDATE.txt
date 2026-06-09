@@ -1,0 +1,40 @@
+PATH NOT FOUND FIX — YEH COMMANDS CHALAO
+=========================================
+
+STEP 1 — Site folder mein jao:
+
+  cd /home/rebelinsta/www/rebelinsta.alwaysdata.net
+
+(Agar yeh path nahi hai to AlwaysData Admin > Web > Sites
+ se apna "Root directory" copy karo aur cd wahan karo)
+
+STEP 2 — Update script download + run:
+
+  wget -O update.sh "https://raw.githubusercontent.com/ujjwalrebel53-wq/Ujj/cursor/multi-instagram-handler-756b/www/update.sh"
+  bash update.sh
+
+STEP 3 — Test:
+
+  https://rebelinsta.alwaysdata.net/setup.php
+  (ya Account Creator try karo)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+AGAR POORA WWW FRESH CHAHIYE (sab kuch dubara):
+
+  cd /home/rebelinsta/www/rebelinsta.alwaysdata.net
+  cd ..
+  rm -rf rebelinsta.alwaysdata.net.old
+  mv rebelinsta.alwaysdata.net rebelinsta.alwaysdata.net.old
+  mkdir rebelinsta.alwaysdata.net
+  cd rebelinsta.alwaysdata.net
+  svn export https://github.com/ujjwalrebel53-wq/Ujj/branches/cursor/multi-instagram-handler-756b/www .
+
+Phir setup.php kholo agar pehli baar hai.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+APNA ROOT PATH KAISE DEKHEIN:
+
+  AlwaysData Admin → Web → Sites → rebelinsta.alwaysdata.net
+  "Root directory" wahi path hai jahan cd karna hai.
