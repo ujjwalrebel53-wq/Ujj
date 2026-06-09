@@ -1,0 +1,7 @@
+.env
+data/*.db
+data/*.json
+data/install.lock
+data/sessions/*
+data/uploads/*
+python-bridge/venv/

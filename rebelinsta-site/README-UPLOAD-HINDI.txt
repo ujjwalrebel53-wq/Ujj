@@ -7,6 +7,15 @@
 STEP 1: ZIP UPLOAD KARO (FTP / File Manager)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+★★★ NAYA (ASAN) PACKAGE USE KARO: rebelinsta-www ★★★
+
+"rebelinsta-www" folder ki SAARI files upload karo yahan:
+
+   /home/rebelinsta/www/rebelinsta.alwaysdata.net/
+
+(pehle test karo: https://rebelinsta.alwaysdata.net/test.php)
+
+--- PURANA (agar www use nahi karna) ---
 Poora "rebelinsta-site" folder upload karo yahan:
 
    /home/rebelinsta/rebelinsta-site/

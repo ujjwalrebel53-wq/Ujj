@@ -1,0 +1,40 @@
+╔══════════════════════════════════════════════════════════════╗
+║  REBELINSTA — YEH FILES DIRECT UPLOAD KARO                  ║
+╚══════════════════════════════════════════════════════════════╝
+
+AlwaysData par DEFAULT site folder mein upload karo:
+
+  /home/rebelinsta/www/rebelinsta.alwaysdata.net/
+
+Yani is folder ke ANDAR yeh sab files aani chahiye:
+  ✓ index.php
+  ✓ setup.php
+  ✓ .htaccess
+  ✓ static/
+  ✓ app/
+  ✓ python-bridge/
+  ✓ data/
+  ✓ views/
+  ✓ config/
+
+FTP / File Manager se "rebelinsta-www" folder ki
+SAARI files (folder ke andar ki) upload karo site root mein.
+
+Phir kholo: https://rebelinsta.alwaysdata.net/setup.php
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ALWAYSDATA ADMIN CHECK:
+
+Web > Sites > rebelinsta.alwaysdata.net
+
+Root directory YEH hona chahiye:
+  /home/rebelinsta/www/rebelinsta.alwaysdata.net
+
+(Agar alag path hai to wahi path use karo — lekin
+ index.php aur setup.php us folder ke root mein hone chahiye)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TEST: Agar yeh kaam kare to files sahi hain:
+  https://rebelinsta.alwaysdata.net/setup.php
