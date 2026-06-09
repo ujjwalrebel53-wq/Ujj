@@ -1,9 +1,0 @@
-<?php
-
-declare(strict_types=1);
-
-require_once dirname(__DIR__) . '/src/bootstrap.php';
-appBoot();
-
-$delay = max((int) ($argv[1] ?? 30), 10);
-AccountCreator::processPendingJobs($delay);

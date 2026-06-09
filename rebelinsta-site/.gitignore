@@ -1,7 +1,0 @@
-.env
-data/*.db
-data/*.json
-data/sessions/*
-data/uploads/*
-data/install.lock
-python-bridge/venv/
