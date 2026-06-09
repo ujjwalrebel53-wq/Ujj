@@ -6,7 +6,21 @@ define('BASE_PATH', dirname(__DIR__));
 define('DATA_PATH', BASE_PATH . '/data');
 define('SESSIONS_PATH', DATA_PATH . '/sessions');
 
+// Load .env if present
+$envFile = BASE_PATH . '/.env';
+if (is_file($envFile)) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+            continue;
+        }
+        [$key, $value] = explode('=', $line, 2);
+        putenv(trim($key) . '=' . trim($value, " \t\"'"));
+    }
+}
+
 require_once BASE_PATH . '/src/Database.php';
+require_once BASE_PATH . '/src/ProxyManager.php';
 require_once BASE_PATH . '/src/Crypto.php';
 require_once BASE_PATH . '/src/TempEmail.php';
 require_once BASE_PATH . '/src/InstagramBridge.php';

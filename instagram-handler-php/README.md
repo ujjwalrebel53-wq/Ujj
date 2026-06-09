@@ -69,12 +69,15 @@ RewriteRule ^ index.php [L]
 
 ## Environment
 
-Optional `.env` file (load manually ya server config se):
+`.env` file banao:
 
 ```
 SECRET_KEY=your-random-secret
 ENCRYPTION_KEY=your-encryption-key
+WEBSHARE_PROXY_URL=https://proxy.webshare.io/api/v2/proxy/list/download/YOUR_TOKEN/-/any/username/direct/-/?plan_id=YOUR_PLAN
 ```
+
+Webshare URL set karne par proxy field khali chhodne se bhi har account ko auto proxy milega.
 
 ## Note
 

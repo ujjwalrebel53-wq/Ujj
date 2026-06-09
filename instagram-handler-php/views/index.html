@@ -75,6 +75,7 @@
           </div>
         </div>
 
+        <div id="proxy-status" class="proxy-status"></div>
         <div class="creator-panels">
           <div class="creator-panel">
             <h3>Create Single Account</h3>
@@ -90,9 +91,12 @@
                 </div>
               </div>
               <div class="form-group">
-                <label>Proxy (optional)</label>
-                <input name="proxy" placeholder="http://user:pass@host:port">
+                <label>Proxy (optional — khali chhodo to Webshare auto)</label>
+                <input name="proxy" placeholder="auto from Webshare pool">
               </div>
+              <label class="checkbox-wrap" style="margin-bottom:14px">
+                <input type="checkbox" name="use_webshare" checked> Webshare proxy auto-use karo
+              </label>
               <div class="form-group">
                 <label>Custom Email (optional — uses temp email if empty)</label>
                 <input name="email" type="email" placeholder="auto temp email will be used">
@@ -138,9 +142,12 @@
                 </div>
               </div>
               <div class="form-group">
-                <label>Proxy (optional — same for all)</label>
-                <input name="proxy" placeholder="http://user:pass@host:port">
+                <label>Proxy (optional — har account ko alag Webshare proxy)</label>
+                <input name="proxy" placeholder="auto rotate from Webshare">
               </div>
+              <label class="checkbox-wrap" style="margin-bottom:14px">
+                <input type="checkbox" name="use_webshare" checked> Webshare proxy auto-use karo
+              </label>
               <button type="submit" class="btn btn-primary">Start Batch Creation</button>
             </form>
           </div>

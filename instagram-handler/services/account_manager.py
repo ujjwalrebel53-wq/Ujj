@@ -15,6 +15,7 @@ from instagrapi.exceptions import (
 
 from services import database as db
 from services.crypto import decrypt, encrypt
+from services.proxy_manager import resolve_proxy
 
 SESSIONS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "sessions")
 os.makedirs(SESSIONS_DIR, exist_ok=True)
@@ -49,7 +50,7 @@ def _save_session(account_id: int, client: Client) -> None:
 
 
 def _load_session_client(account_id: int, secrets: dict[str, Any]) -> Client | None:
-    client = _build_client(secrets.get("proxy") or "")
+    client = _build_client(resolve_proxy(secrets.get("proxy") or ""))
     settings = None
     session_json = decrypt(secrets.get("session_data") or "")
     if session_json:
@@ -89,7 +90,7 @@ def login_account(
     if not pwd and not secrets.get("session_data"):
         raise AccountLoginError("Password required")
 
-    client = _build_client(secrets.get("proxy") or "")
+    client = _build_client(resolve_proxy(secrets.get("proxy") or ""))
 
     with _lock:
         try:
@@ -208,7 +209,7 @@ def import_session(account_id: int, session_settings: dict[str, Any]) -> dict[st
     secrets = db.get_account_secrets(account_id)
     if not secrets:
         raise AccountLoginError("Account not found")
-    client = _build_client(secrets.get("proxy") or "")
+    client = _build_client(resolve_proxy(secrets.get("proxy") or ""))
     client.set_settings(session_settings)
     try:
         client.get_timeline_feed()

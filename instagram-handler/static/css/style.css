@@ -580,6 +580,29 @@ body {
   }
 }
 
+.proxy-status {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.9rem;
+}
+
+.proxy-status .proxy-info {
+  color: var(--muted);
+}
+
+.proxy-status .proxy-count {
+  color: var(--success);
+  font-weight: 700;
+}
+
 .creator-panels {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));

@@ -104,6 +104,7 @@ final class AccountCreator
         $month = random_int(1, 12);
         $day = random_int(1, 28);
 
+        $proxy = ProxyManager::resolveProxy($proxy);
         $result = InstagramBridge::call('signup', [
             'username' => $username,
             'password' => $password,
@@ -152,11 +153,12 @@ final class AccountCreator
 
     public static function startSingle(array $data): array
     {
+        $jobProxy = ProxyManager::resolveProxy($data['proxy'] ?? '', (bool) ($data['use_webshare'] ?? true));
         $job = Database::createCreationJob([
             'username' => $data['username'] ?? self::generateUsername($data['username_prefix'] ?? ''),
             'password' => $data['password'] ?? self::generatePassword(),
             'full_name' => $data['full_name'] ?? self::generateFullName(),
-            'proxy' => $data['proxy'] ?? '',
+            'proxy' => $jobProxy,
             'group_name' => $data['group_name'] ?? 'auto-created',
             'email' => $data['email'] ?? '',
             'job_batch_id' => 'single',
@@ -200,12 +202,14 @@ final class AccountCreator
         $count = min((int) ($data['count'] ?? 1), 20);
         $batchId = bin2hex(random_bytes(6));
         $jobs = [];
+        $explicitProxy = $data['proxy'] ?? '';
+        $autoProxy = (bool) ($data['use_webshare'] ?? true);
         for ($i = 0; $i < $count; $i++) {
             $jobs[] = Database::createCreationJob([
                 'username' => self::generateUsername($data['username_prefix'] ?? ''),
                 'password' => self::generatePassword(),
                 'full_name' => self::generateFullName(),
-                'proxy' => $data['proxy'] ?? '',
+                'proxy' => ProxyManager::resolveProxy($explicitProxy, $autoProxy),
                 'group_name' => $data['group_name'] ?? 'auto-created',
                 'job_batch_id' => $batchId,
             ]);

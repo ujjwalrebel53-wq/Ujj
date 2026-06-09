@@ -13,6 +13,7 @@ from services import database as db
 from services.account_creator import AccountCreatorError
 from services.account_manager import AccountLoginError
 from services.crypto import encrypt
+from services import proxy_manager as proxies
 
 load_dotenv()
 
@@ -62,11 +63,12 @@ def api_create_account():
     if db.get_account_by_username(username):
         return jsonify({"error": "Account already exists"}), 409
     password = data.get("password", "")
+    proxy = proxies.resolve_proxy(data.get("proxy", ""), auto=data.get("use_webshare", True))
     account = db.create_account(
         {
             "username": username,
             "password_enc": encrypt(password) if password else "",
-            "proxy": data.get("proxy", ""),
+            "proxy": proxy,
             "group_name": data.get("group_name", "default"),
             "notes": data.get("notes", ""),
         }
@@ -237,6 +239,23 @@ def api_create_scheduled():
 @app.route("/api/export")
 def api_export():
     return jsonify({"data": db.export_accounts()})
+
+
+@app.route("/api/proxies/stats")
+def api_proxy_stats():
+    try:
+        return jsonify(proxies.get_stats())
+    except Exception as exc:
+        return jsonify({"error": str(exc), "enabled": bool(proxies.get_proxy_url())}), 500
+
+
+@app.route("/api/proxies/refresh", methods=["POST"])
+def api_proxy_refresh():
+    try:
+        proxy_list = proxies.fetch_proxies(force=True)
+        return jsonify({"ok": True, "total_proxies": len(proxy_list)})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 @app.route("/api/creator/preview")

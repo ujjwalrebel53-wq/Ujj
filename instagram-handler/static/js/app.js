@@ -29,6 +29,7 @@ function switchPage(page) {
   if (page === "dashboard") loadDashboard();
   if (page === "creator") {
     loadCreatorJobs();
+    loadProxyStatus();
     startCreatorPolling();
   } else {
     stopCreatorPolling();
@@ -252,6 +253,7 @@ async function submitAdd(e) {
     username: form.username.value,
     password: form.password.value,
     proxy: form.proxy.value,
+    use_webshare: true,
     group_name: form.group_name.value || "default",
     notes: form.notes.value,
   };
@@ -418,6 +420,38 @@ function stopCreatorPolling() {
   }
 }
 
+async function loadProxyStatus() {
+  const el = document.getElementById("proxy-status");
+  if (!el) return;
+  try {
+    const stats = await api("/api/proxies/stats");
+    if (!stats.enabled) {
+      el.innerHTML = '<span class="proxy-info">Webshare proxy URL set nahi hai (.env mein WEBSHARE_PROXY_URL)</span>';
+      return;
+    }
+    el.innerHTML = `
+      <span class="proxy-info">Webshare Proxy Pool: <span class="proxy-count">${stats.total_proxies}</span> proxies loaded</span>
+      <button class="btn btn-secondary btn-sm" onclick="refreshProxies()">Refresh Proxies</button>`;
+  } catch (e) {
+    el.innerHTML = `<span class="proxy-info" style="color:var(--error)">${esc(e.message)}</span>`;
+  }
+}
+
+async function refreshProxies() {
+  try {
+    const res = await api("/api/proxies/refresh", { method: "POST" });
+    toast(`${res.total_proxies} proxies refreshed from Webshare`);
+    loadProxyStatus();
+  } catch (e) {
+    toast(e.message, "error");
+  }
+}
+
+function formUseWebshare(form) {
+  const cb = form.querySelector('[name="use_webshare"]');
+  return cb ? cb.checked : true;
+}
+
 async function previewProfiles() {
   const form = document.getElementById("creator-single-form");
   const prefix = form.username_prefix.value;
@@ -448,6 +482,7 @@ async function submitCreatorSingle(e) {
     username_prefix: form.username_prefix.value,
     group_name: form.group_name.value || "auto-created",
     proxy: form.proxy.value,
+    use_webshare: formUseWebshare(form),
     email: form.email.value,
     username: form.username.value,
     password: form.password.value,
@@ -486,6 +521,7 @@ async function submitCreatorBatch(e) {
     username_prefix: form.username_prefix.value,
     group_name: form.group_name.value || "auto-created",
     proxy: form.proxy.value,
+    use_webshare: formUseWebshare(form),
   };
   if (!confirm(`Start creating ${data.count} accounts?`)) return;
   try {

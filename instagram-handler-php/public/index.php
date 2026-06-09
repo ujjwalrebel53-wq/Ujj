@@ -59,10 +59,11 @@ function routeApi(string $method, string $uri): void
             Response::error('Account already exists', 409);
         }
         $password = $data['password'] ?? '';
+        $proxy = ProxyManager::resolveProxy($data['proxy'] ?? '', (bool) ($data['use_webshare'] ?? true));
         $account = Database::createAccount([
             'username' => $username,
             'password_enc' => $password ? Crypto::encrypt($password) : '',
-            'proxy' => $data['proxy'] ?? '',
+            'proxy' => $proxy,
             'group_name' => $data['group_name'] ?? 'default',
             'notes' => $data['notes'] ?? '',
         ]);
@@ -171,6 +172,22 @@ function routeApi(string $method, string $uri): void
     }
     if ($uri === '/api/export' && $method === 'GET') {
         Response::json(['data' => Database::exportAccounts()]);
+    }
+
+    if ($uri === '/api/proxies/stats' && $method === 'GET') {
+        try {
+            Response::json(ProxyManager::getStats());
+        } catch (Throwable $e) {
+            Response::json(['error' => $e->getMessage(), 'enabled' => ProxyManager::getProxyUrl() !== ''], 500);
+        }
+    }
+    if ($uri === '/api/proxies/refresh' && $method === 'POST') {
+        try {
+            $list = ProxyManager::fetchProxies(true);
+            Response::json(['ok' => true, 'total_proxies' => count($list)]);
+        } catch (Throwable $e) {
+            Response::error($e->getMessage(), 500);
+        }
     }
 
     // Creator routes

@@ -12,6 +12,7 @@ from instagrapi.exceptions import ClientError, PleaseWaitFewMinutes
 
 from services import database as db
 from services.crypto import encrypt
+from services.proxy_manager import resolve_proxy
 from services.temp_email import TempEmail, TempEmailError
 
 FIRST_NAMES = [
@@ -143,6 +144,7 @@ def create_instagram_account(
     elif verification_code and job_id:
         _pending_codes[job_id] = verification_code
 
+    proxy = resolve_proxy(proxy)
     client = _build_client(proxy)
     if job_id:
         client.challenge_code_handler = _make_code_handler(job_id, temp_mail)
@@ -202,13 +204,14 @@ def create_instagram_account(
 
 
 def start_single_creation(data: dict[str, Any]) -> dict[str, Any]:
+    job_proxy = resolve_proxy(data.get("proxy", ""), auto=data.get("use_webshare", True))
     job = db.create_creation_job(
         {
             "username": data.get("username") or generate_username(data.get("username_prefix", "")),
             "email": data.get("email", ""),
             "password": data.get("password") or generate_password(),
             "full_name": data.get("full_name") or generate_full_name(),
-            "proxy": data.get("proxy", ""),
+            "proxy": job_proxy,
             "group_name": data.get("group_name", "auto-created"),
             "job_batch_id": "single",
         }
@@ -250,17 +253,19 @@ def start_batch_creation(data: dict[str, Any]) -> dict[str, Any]:
     batch_id = uuid.uuid4().hex[:12]
     delay = max(int(data.get("delay_seconds", 30)), 10)
     prefix = data.get("username_prefix", "")
-    proxy = data.get("proxy", "")
+    explicit_proxy = data.get("proxy", "")
     group = data.get("group_name", "auto-created")
+    auto_proxy = data.get("use_webshare", True)
 
     jobs = []
     for _ in range(count):
+        job_proxy = resolve_proxy(explicit_proxy, auto=auto_proxy)
         job = db.create_creation_job(
             {
                 "username": generate_username(prefix),
                 "password": generate_password(),
                 "full_name": generate_full_name(),
-                "proxy": proxy,
+                "proxy": job_proxy,
                 "group_name": group,
                 "job_batch_id": batch_id,
             }

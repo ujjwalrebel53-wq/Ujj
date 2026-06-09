@@ -24,7 +24,7 @@ final class AccountManager
         $result = InstagramBridge::call('login', [
             'username' => $secrets['username'],
             'password' => $pwd,
-            'proxy' => $secrets['proxy'] ?? '',
+            'proxy' => ProxyManager::resolveProxy($secrets['proxy'] ?? ''),
             'session_path' => self::sessionPath($accountId),
             'verification_code' => $verificationCode,
         ]);
@@ -103,7 +103,7 @@ final class AccountManager
         }
         $result = InstagramBridge::call('post_photo', [
             'username' => $secrets['username'],
-            'proxy' => $secrets['proxy'] ?? '',
+            'proxy' => ProxyManager::resolveProxy($secrets['proxy'] ?? ''),
             'session_path' => self::sessionPath($accountId),
             'image_path' => $imagePath,
             'caption' => $caption,

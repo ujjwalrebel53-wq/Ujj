@@ -54,7 +54,17 @@ Browser mein kholo: **http://localhost:5050**
 2. Checkboxes se accounts select karo
 3. **Bulk Login** ya **Bulk Refresh** use karo
 
-### Proxy Format
+### Webshare Proxy (Auto)
+
+`.env` mein apna Webshare proxy list URL set karo:
+
+```
+WEBSHARE_PROXY_URL=https://proxy.webshare.io/api/v2/proxy/list/download/YOUR_TOKEN/-/any/username/direct/-/?plan_id=YOUR_PLAN
+```
+
+Jab account mein proxy khali ho, tool automatically Webshare pool se proxy assign karega. Batch create mein har account ko alag proxy milta hai (rotation).
+
+### Manual Proxy Format
 
 ```
 http://username:password@proxy-host:port
