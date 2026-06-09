@@ -2,6 +2,7 @@ const API = "";
 let accounts = [];
 let selectedIds = new Set();
 let currentPage = "dashboard";
+let creatorPollTimer = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   initNav();
@@ -26,6 +27,12 @@ function switchPage(page) {
   if (page === "accounts") loadAccounts();
   if (page === "activity") loadActivity();
   if (page === "dashboard") loadDashboard();
+  if (page === "creator") {
+    loadCreatorJobs();
+    startCreatorPolling();
+  } else {
+    stopCreatorPolling();
+  }
 }
 
 async function api(path, options = {}) {
@@ -54,6 +61,8 @@ async function loadDashboard() {
     document.getElementById("stat-active").textContent = stats.active_accounts;
     document.getElementById("stat-error").textContent = stats.error_accounts;
     document.getElementById("stat-pending").textContent = stats.pending_posts;
+    document.getElementById("stat-created").textContent = stats.accounts_created || 0;
+    document.getElementById("stat-creating").textContent = stats.creation_in_progress || 0;
   } catch (e) {
     toast(e.message, "error");
   }
@@ -359,6 +368,7 @@ async function loadActivity() {
       post_photo: "📸",
       schedule_post: "📅",
       account_deleted: "🗑️",
+      auto_create: "🤖",
     };
     list.innerHTML = items
       .map(
@@ -392,6 +402,218 @@ async function exportData() {
   } catch (e) {
     toast(e.message, "error");
   }
+}
+
+function startCreatorPolling() {
+  stopCreatorPolling();
+  creatorPollTimer = setInterval(() => {
+    if (currentPage === "creator") loadCreatorJobs(true);
+  }, 5000);
+}
+
+function stopCreatorPolling() {
+  if (creatorPollTimer) {
+    clearInterval(creatorPollTimer);
+    creatorPollTimer = null;
+  }
+}
+
+async function previewProfiles() {
+  const form = document.getElementById("creator-single-form");
+  const prefix = form.username_prefix.value;
+  try {
+    const profiles = await api(`/api/creator/preview?count=5&prefix=${encodeURIComponent(prefix)}`);
+    const box = document.getElementById("preview-box");
+    const list = document.getElementById("preview-list");
+    box.style.display = "block";
+    list.innerHTML = profiles
+      .map(
+        (p) => `
+      <div class="preview-item">
+        <strong>@${esc(p.username)}</strong>
+        <span>${esc(p.full_name)}</span>
+        <code>${esc(p.password)}</code>
+      </div>`
+      )
+      .join("");
+  } catch (e) {
+    toast(e.message, "error");
+  }
+}
+
+async function submitCreatorSingle(e) {
+  e.preventDefault();
+  const form = e.target;
+  const data = {
+    username_prefix: form.username_prefix.value,
+    group_name: form.group_name.value || "auto-created",
+    proxy: form.proxy.value,
+    email: form.email.value,
+    username: form.username.value,
+    password: form.password.value,
+  };
+  toast("Creating account... this may take 1-2 minutes");
+  try {
+    const res = await fetch("/api/creator/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    const result = await res.json();
+    if (result.success) {
+      showCredentials(result);
+      toast("Account created successfully!");
+      loadCreatorJobs();
+      loadDashboard();
+    } else if (result.needs_code) {
+      openVerifyModal(result.job.id);
+      toast("Verification code required — check email", "error");
+    } else {
+      toast(result.error || "Creation failed", "error");
+    }
+    loadCreatorJobs();
+  } catch (e) {
+    toast(e.message, "error");
+  }
+}
+
+async function submitCreatorBatch(e) {
+  e.preventDefault();
+  const form = e.target;
+  const data = {
+    count: parseInt(form.count.value, 10),
+    delay_seconds: parseInt(form.delay_seconds.value, 10),
+    username_prefix: form.username_prefix.value,
+    group_name: form.group_name.value || "auto-created",
+    proxy: form.proxy.value,
+  };
+  if (!confirm(`Start creating ${data.count} accounts?`)) return;
+  try {
+    const result = await api("/api/creator/batch", { method: "POST", body: JSON.stringify(data) });
+    toast(`Batch started — ${result.count} accounts queued`);
+    loadCreatorJobs();
+    loadDashboard();
+  } catch (e) {
+    toast(e.message, "error");
+  }
+}
+
+async function loadCreatorJobs(silent = false) {
+  const container = document.getElementById("creator-jobs");
+  if (!container) return;
+  if (!silent) container.innerHTML = '<div class="loading" style="margin:20px auto"></div>';
+  try {
+    const jobs = await api("/api/creator/jobs?limit=30");
+    if (!jobs.length) {
+      container.innerHTML = '<div class="empty-state"><p>No creation jobs yet</p></div>';
+      return;
+    }
+    const statusClass = {
+      success: "active",
+      failed: "error",
+      pending: "inactive",
+      creating: "inactive",
+      waiting_code: "error",
+    };
+    container.innerHTML = jobs
+      .map((j) => {
+        const actions =
+          j.status === "waiting_code"
+            ? `<button class="btn btn-sm btn-primary" onclick="openVerifyModal(${j.id})">Enter Code</button>`
+            : j.status === "failed"
+              ? `<button class="btn btn-sm btn-secondary" onclick="retryJob(${j.id})">Retry</button>`
+              : j.status === "success"
+                ? `<button class="btn btn-sm btn-secondary" onclick="showJobCredentials(${j.id})">Show Creds</button>`
+                : "";
+        return `
+      <div class="job-card">
+        <div class="job-header">
+          <strong>@${esc(j.username)}</strong>
+          <span class="status-badge status-${statusClass[j.status] || "inactive"}">${j.status}</span>
+        </div>
+        <div class="job-meta">
+          <span>${esc(j.full_name || "")}</span>
+          ${j.email ? `<span>📧 ${esc(j.email)}</span>` : ""}
+          <span>📁 ${esc(j.group_name)}</span>
+          <span>${new Date(j.created_at).toLocaleString()}</span>
+        </div>
+        ${j.error ? `<p class="job-error">${esc(j.error)}</p>` : ""}
+        <div class="account-actions">${actions}</div>
+      </div>`;
+      })
+      .join("");
+  } catch (e) {
+    if (!silent) container.innerHTML = `<div class="empty-state"><p>${e.message}</p></div>`;
+  }
+}
+
+function openVerifyModal(jobId) {
+  document.getElementById("verify-job-id").value = jobId;
+  document.getElementById("verify-code").value = "";
+  openModal("verify-modal");
+}
+
+async function submitVerifyCode(e) {
+  e.preventDefault();
+  const jobId = document.getElementById("verify-job-id").value;
+  const code = document.getElementById("verify-code").value;
+  try {
+    const result = await api(`/api/creator/jobs/${jobId}/verify`, {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
+    closeModal("verify-modal");
+    if (result.success) {
+      showCredentials(result);
+      toast("Account created!");
+    } else {
+      toast(result.error || "Verification failed", "error");
+    }
+    loadCreatorJobs();
+    loadDashboard();
+  } catch (e) {
+    toast(e.message, "error");
+  }
+}
+
+async function retryJob(jobId) {
+  toast("Retrying...");
+  try {
+    const result = await api(`/api/creator/jobs/${jobId}/retry`, { method: "POST" });
+    if (result.success) {
+      showCredentials(result);
+      toast("Account created!");
+    } else if (result.needs_code) {
+      openVerifyModal(jobId);
+    } else {
+      toast(result.error || "Retry failed", "error");
+    }
+    loadCreatorJobs();
+  } catch (e) {
+    toast(e.message, "error");
+  }
+}
+
+async function showJobCredentials(jobId) {
+  try {
+    const job = await api(`/api/creator/jobs/${jobId}`);
+    showCredentials(job);
+  } catch (e) {
+    toast(e.message, "error");
+  }
+}
+
+function showCredentials(data) {
+  const body = document.getElementById("creds-body");
+  body.innerHTML = `
+    <div class="creds-box">
+      <div class="cred-row"><label>Username</label><code>@${esc(data.username)}</code></div>
+      <div class="cred-row"><label>Password</label><code>${esc(data.password)}</code></div>
+      <div class="cred-row"><label>Email</label><code>${esc(data.email || "N/A")}</code></div>
+      <div class="cred-row"><label>Full Name</label><code>${esc(data.full_name || "")}</code></div>
+    </div>
+    <p style="color:var(--warning);font-size:0.85rem;margin-top:12px">⚠️ Credentials save kar lo — baad mein dubara nahi dikhenge!</p>`;
+  openModal("creds-modal");
 }
 
 document.getElementById("search-accounts")?.addEventListener("input", renderAccounts);

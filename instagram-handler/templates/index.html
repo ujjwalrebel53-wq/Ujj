@@ -15,6 +15,7 @@
       </div>
       <button class="nav-item active" data-page="dashboard">📊 Dashboard</button>
       <button class="nav-item" data-page="accounts">👥 Accounts</button>
+      <button class="nav-item" data-page="creator">🤖 Account Creator</button>
       <button class="nav-item" data-page="activity">📋 Activity Log</button>
     </aside>
 
@@ -45,6 +46,14 @@
             <div class="stat-label">Scheduled Posts</div>
             <div class="stat-value" id="stat-pending">0</div>
           </div>
+          <div class="stat-card">
+            <div class="stat-label">Auto-Created</div>
+            <div class="stat-value" id="stat-created" style="color:var(--accent3)">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Creating Now</div>
+            <div class="stat-value" id="stat-creating">0</div>
+          </div>
         </div>
         <div class="page-header" style="margin-top:8px">
           <h2 style="font-size:1.2rem">Quick Actions</h2>
@@ -52,8 +61,101 @@
         <div class="toolbar">
           <button class="btn btn-primary" onclick="switchPage('accounts'); openAddModal()">+ Add Account</button>
           <button class="btn btn-secondary" onclick="switchPage('accounts')">View All Accounts</button>
+          <button class="btn btn-secondary" onclick="switchPage('creator')">Auto Create Accounts</button>
           <button class="btn btn-secondary" onclick="exportData()">Export Data</button>
         </div>
+      </section>
+
+      <!-- Account Creator -->
+      <section id="page-creator" class="page">
+        <div class="page-header">
+          <div>
+            <h1>Account Creator</h1>
+            <p>Automatically create Instagram accounts with temp email verification</p>
+          </div>
+        </div>
+
+        <div class="creator-panels">
+          <div class="creator-panel">
+            <h3>Create Single Account</h3>
+            <form id="creator-single-form" onsubmit="submitCreatorSingle(event)">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Username Prefix (optional)</label>
+                  <input name="username_prefix" placeholder="mybrand">
+                </div>
+                <div class="form-group">
+                  <label>Group</label>
+                  <input name="group_name" value="auto-created">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Proxy (optional)</label>
+                <input name="proxy" placeholder="http://user:pass@host:port">
+              </div>
+              <div class="form-group">
+                <label>Custom Email (optional — uses temp email if empty)</label>
+                <input name="email" type="email" placeholder="auto temp email will be used">
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Custom Username (optional)</label>
+                  <input name="username" placeholder="auto-generated">
+                </div>
+                <div class="form-group">
+                  <label>Custom Password (optional)</label>
+                  <input name="password" placeholder="auto-generated">
+                </div>
+              </div>
+              <div class="toolbar" style="margin:0">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="previewProfiles()">Preview Profiles</button>
+                <button type="submit" class="btn btn-primary">Create Account</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="creator-panel">
+            <h3>Batch Create</h3>
+            <form id="creator-batch-form" onsubmit="submitCreatorBatch(event)">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Number of Accounts</label>
+                  <input name="count" type="number" min="1" max="20" value="3" required>
+                </div>
+                <div class="form-group">
+                  <label>Delay Between (seconds)</label>
+                  <input name="delay_seconds" type="number" min="10" value="30" required>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Username Prefix</label>
+                  <input name="username_prefix" placeholder="auto">
+                </div>
+                <div class="form-group">
+                  <label>Group</label>
+                  <input name="group_name" value="auto-created">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Proxy (optional — same for all)</label>
+                <input name="proxy" placeholder="http://user:pass@host:port">
+              </div>
+              <button type="submit" class="btn btn-primary">Start Batch Creation</button>
+            </form>
+          </div>
+        </div>
+
+        <div id="preview-box" class="preview-box" style="display:none">
+          <h3>Profile Preview</h3>
+          <div id="preview-list"></div>
+        </div>
+
+        <div class="page-header" style="margin-top:28px">
+          <h2 style="font-size:1.2rem">Creation Jobs</h2>
+          <button class="btn btn-secondary btn-sm" onclick="loadCreatorJobs()">Refresh</button>
+        </div>
+        <div id="creator-jobs" class="jobs-list"></div>
       </section>
 
       <!-- Accounts -->
@@ -190,6 +292,44 @@
           <button type="submit" class="btn btn-primary">Post Now</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Verify Code Modal -->
+  <div id="verify-modal" class="modal-overlay" onclick="if(event.target===this)closeModal('verify-modal')">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Enter Verification Code</h2>
+        <button class="modal-close" onclick="closeModal('verify-modal')">&times;</button>
+      </div>
+      <form class="modal-body" onsubmit="submitVerifyCode(event)">
+        <input type="hidden" id="verify-job-id">
+        <p style="color:var(--muted);margin-bottom:16px;font-size:0.9rem">
+          Instagram ne email par verification code bheja hai. Code enter karo.
+        </p>
+        <div class="form-group">
+          <label>6-Digit Code</label>
+          <input id="verify-code" required pattern="[0-9]{6}" maxlength="6" placeholder="123456">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('verify-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Verify & Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Success Credentials Modal -->
+  <div id="creds-modal" class="modal-overlay" onclick="if(event.target===this)closeModal('creds-modal')">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Account Created!</h2>
+        <button class="modal-close" onclick="closeModal('creds-modal')">&times;</button>
+      </div>
+      <div class="modal-body" id="creds-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closeModal('creds-modal')">Done</button>
+      </div>
     </div>
   </div>
 

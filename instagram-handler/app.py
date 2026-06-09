@@ -7,8 +7,10 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
+from services import account_creator as creator
 from services import account_manager as ig
 from services import database as db
+from services.account_creator import AccountCreatorError
 from services.account_manager import AccountLoginError
 from services.crypto import encrypt
 
@@ -235,6 +237,66 @@ def api_create_scheduled():
 @app.route("/api/export")
 def api_export():
     return jsonify({"data": db.export_accounts()})
+
+
+@app.route("/api/creator/preview")
+def api_creator_preview():
+    count = min(int(request.args.get("count", 5)), 20)
+    prefix = request.args.get("prefix", "")
+    return jsonify(creator.preview_profiles(count, prefix))
+
+
+@app.route("/api/creator/create", methods=["POST"])
+def api_creator_create():
+    data = request.get_json(force=True)
+    result = creator.start_single_creation(data)
+    status = 201 if result.get("success") else 400
+    return jsonify(result), status
+
+
+@app.route("/api/creator/batch", methods=["POST"])
+def api_creator_batch():
+    data = request.get_json(force=True)
+    if int(data.get("count", 0)) < 1:
+        return jsonify({"error": "count must be at least 1"}), 400
+    return jsonify(creator.start_batch_creation(data)), 201
+
+
+@app.route("/api/creator/jobs")
+def api_creator_jobs():
+    batch_id = request.args.get("batch_id")
+    limit = int(request.args.get("limit", 50))
+    return jsonify(db.list_creation_jobs(batch_id, limit))
+
+
+@app.route("/api/creator/jobs/<int:job_id>")
+def api_creator_job(job_id):
+    job = db.get_creation_job(job_id)
+    if not job:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(job)
+
+
+@app.route("/api/creator/jobs/<int:job_id>/verify", methods=["POST"])
+def api_creator_verify(job_id):
+    data = request.get_json(force=True)
+    code = (data.get("code") or "").strip()
+    if not code:
+        return jsonify({"error": "Verification code required"}), 400
+    try:
+        result = creator.verify_job_code(job_id, code)
+        return jsonify(result)
+    except AccountCreatorError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/creator/jobs/<int:job_id>/retry", methods=["POST"])
+def api_creator_retry(job_id):
+    try:
+        result = creator.retry_job(job_id)
+        return jsonify(result)
+    except AccountCreatorError as exc:
+        return jsonify({"error": str(exc)}), 400
 
 
 @app.route("/uploads/<path:filename>")

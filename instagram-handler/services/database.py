@@ -66,6 +66,22 @@ def init_db() -> None:
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS creation_jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                email TEXT DEFAULT '',
+                password TEXT DEFAULT '',
+                full_name TEXT DEFAULT '',
+                proxy TEXT DEFAULT '',
+                group_name TEXT DEFAULT 'auto-created',
+                status TEXT DEFAULT 'pending',
+                error TEXT DEFAULT '',
+                account_id INTEGER,
+                job_batch_id TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """
         )
 
@@ -246,12 +262,20 @@ def get_stats() -> dict[str, Any]:
         pending = conn.execute(
             "SELECT COUNT(*) as c FROM scheduled_posts WHERE status = 'pending'"
         ).fetchone()["c"]
+        created = conn.execute(
+            "SELECT COUNT(*) as c FROM creation_jobs WHERE status = 'success'"
+        ).fetchone()["c"]
+        creating = conn.execute(
+            "SELECT COUNT(*) as c FROM creation_jobs WHERE status IN ('pending', 'creating', 'waiting_code')"
+        ).fetchone()["c"]
     return {
         "total_accounts": total,
         "active_accounts": active,
         "error_accounts": error,
         "pending_posts": pending,
         "groups": len(list_groups()),
+        "accounts_created": created,
+        "creation_in_progress": creating,
     }
 
 
@@ -307,6 +331,87 @@ def update_scheduled_post(post_id: int, data: dict[str, Any]) -> None:
     values.append(post_id)
     with get_conn() as conn:
         conn.execute(f"UPDATE scheduled_posts SET {', '.join(fields)} WHERE id = ?", values)
+
+
+def create_creation_job(data: dict[str, Any]) -> dict[str, Any]:
+    now = _utcnow()
+    with get_conn() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO creation_jobs (
+                username, email, password, full_name, proxy, group_name,
+                status, job_batch_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                data["username"],
+                data.get("email", ""),
+                data.get("password", ""),
+                data.get("full_name", ""),
+                data.get("proxy", ""),
+                data.get("group_name", "auto-created"),
+                data.get("status", "pending"),
+                data.get("job_batch_id", ""),
+                now,
+                now,
+            ),
+        )
+        job_id = cur.lastrowid
+    return get_creation_job(job_id)
+
+
+def get_creation_job(job_id: int) -> dict[str, Any] | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM creation_jobs WHERE id = ?", (job_id,)).fetchone()
+    return row_to_dict(row)
+
+
+def update_creation_job(job_id: int, data: dict[str, Any]) -> dict[str, Any] | None:
+    fields = []
+    values = []
+    allowed = {
+        "username", "email", "password", "full_name", "proxy", "group_name",
+        "status", "error", "account_id", "job_batch_id",
+    }
+    for key, value in data.items():
+        if key in allowed:
+            fields.append(f"{key} = ?")
+            values.append(value)
+    if not fields:
+        return get_creation_job(job_id)
+    fields.append("updated_at = ?")
+    values.append(_utcnow())
+    values.append(job_id)
+    with get_conn() as conn:
+        conn.execute(f"UPDATE creation_jobs SET {', '.join(fields)} WHERE id = ?", values)
+    return get_creation_job(job_id)
+
+
+def list_creation_jobs(batch_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    with get_conn() as conn:
+        if batch_id:
+            rows = conn.execute(
+                "SELECT * FROM creation_jobs WHERE job_batch_id = ? ORDER BY id DESC LIMIT ?",
+                (batch_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM creation_jobs ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def list_pending_creation_jobs() -> list[dict[str, Any]]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM creation_jobs
+            WHERE status = 'pending'
+            ORDER BY id ASC
+            """
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def export_accounts() -> str:

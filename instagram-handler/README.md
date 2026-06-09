@@ -14,6 +14,9 @@ Ek powerful web-based tool jo multiple Instagram accounts ko ek jagah se manage 
 - **Activity Log** — Saari actions ka record
 - **Encrypted Storage** — Passwords aur sessions encrypted store hote hain
 - **Export Data** — Account data JSON mein export karo
+- **Auto Account Creator** — Temp email se automatically naye Instagram accounts banao
+- **Batch Creation** — Ek saath 20 tak accounts queue mein create karo
+- **Profile Generator** — Username, password, full name auto-generate
 
 ## Quick Start
 
@@ -62,6 +65,19 @@ socks5://username:password@proxy-host:port
 
 Login par agar 2FA error aaye, verification code enter karo jab prompt aaye.
 
+### Auto Account Creator
+
+1. Sidebar se **Account Creator** page kholo
+2. **Single Account** — ek account turant create karo (temp email automatic)
+3. **Batch Create** — kitne accounts chahiye (1-20) aur delay set karo
+4. Verification code chahiye ho to **Enter Code** button se code daalo
+5. Success par credentials dikhenge — save kar lena!
+
+**Tips:**
+- Har account ke liye alag proxy use karo (ban se bachne ke liye)
+- Batch mein kam se kam 30 second delay rakho
+- Temp email (1secmail) se automatic verification hoti hai
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
@@ -78,6 +94,12 @@ Login par agar 2FA error aaye, verification code enter karo jab prompt aaye.
 | POST | `/api/accounts/:id/post` | Post photo |
 | GET | `/api/activity` | Activity log |
 | GET | `/api/export` | Export account data |
+| GET | `/api/creator/preview` | Preview generated profiles |
+| POST | `/api/creator/create` | Create single account |
+| POST | `/api/creator/batch` | Batch create accounts |
+| GET | `/api/creator/jobs` | List creation jobs |
+| POST | `/api/creator/jobs/:id/verify` | Submit email verification code |
+| POST | `/api/creator/jobs/:id/retry` | Retry failed job |
 
 ## Security Notes
 
