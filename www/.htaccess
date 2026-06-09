@@ -1,9 +1,6 @@
 DirectoryIndex index.php setup.php
-
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [L]
-
-# Block sensitive folders from web access
-RewriteRule ^(app|data|python-bridge|config|cli|views)/ - [F,L]
+RewriteRule ^(data|venv)/ - [F,L]

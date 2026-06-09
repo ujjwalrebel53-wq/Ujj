@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RebelInsta</title>
+<link rel="stylesheet" href="/a.css">
+</head>
+<body>
+<div class="app">
+<aside class="side">
+<div class="logo">📸 RebelInsta</div>
+<button class="nav on" data-p="dash">Dashboard</button>
+<button class="nav" data-p="acc">Accounts</button>
+<button class="nav" data-p="create">Creator</button>
+<button class="nav" data-p="logs">Live Logs</button>
+</aside>
+<main class="main">
+<section class="page on" id="dash">
+<h1>Dashboard</h1><p class="sub">Multi IG account handler</p>
+<div class="grid" id="stats"></div>
+<div class="row"><button class="btn btn-p" onclick="go('acc');addAcc()">+ Add Account</button><button class="btn btn-s" onclick="go('create')">Auto Create</button></div>
+</section>
+<section class="page" id="acc">
+<h1>Accounts</h1>
+<div class="row"><input id="q" placeholder="Search..." oninput="drawAcc()"><button class="btn btn-s" onclick="loadAcc()">Refresh</button><button class="btn btn-p" onclick="addAcc()">+ Add</button></div>
+<div class="acc-grid" id="accs"></div>
+</section>
+<section class="page" id="create">
+<h1>Account Creator</h1><p class="sub">Indian names + temp email OTP. Background queue — page atkega nahi.</p>
+<div id="px" class="card" style="margin-bottom:12px;font-size:.88rem;color:var(--m)"></div>
+<div class="row">
+<div class="fg"><label>Username Prefix</label><input id="pre" placeholder="rahul"></div>
+<div class="fg"><label>Group</label><input id="grp" value="auto-created"></div>
+</div>
+<label style="display:flex;gap:8px;align-items:center;margin-bottom:12px;font-size:.88rem"><input type="checkbox" id="ws" checked> Webshare proxy auto</label>
+<div class="row">
+<button class="btn btn-s" onclick="preview()">Preview</button>
+<button class="btn btn-p" onclick="create1()">Create 1 Account</button>
+</div>
+<h2>Batch</h2>
+<div class="row">
+<div class="fg"><label>Count</label><input type="number" id="cnt" value="2" min="1" max="10"></div>
+<div class="fg"><label>Delay (sec)</label><input type="number" id="dly" value="90" min="60"></div>
+</div>
+<button class="btn btn-p" onclick="createBatch()">Start Batch</button>
+<h2>Jobs</h2><div id="jobs"></div>
+</section>
+<section class="page" id="logs">
+<h1>Live Logs</h1>
+<div class="row"><button class="btn btn-s" onclick="loadLogs()">Refresh</button><button class="btn btn-s" onclick="clearLogs()">Clear</button></div>
+<div class="logs" id="logbox"></div>
+</section>
+</main>
+</div>
+<div class="modal" id="modal" onclick="if(event.target===this)closeM()"><div class="modal-c" id="modal-body"></div></div>
+<div class="prog" id="prog"><div class="prog-c"><h3 id="pt">Creating...</h3><div class="bar"><i id="pb"></i></div><p id="pm" style="font-size:.85rem;color:var(--m)">Queue...</p><button class="btn btn-s btn-sm" onclick="hideProg()">Background</button></div></div>
+<div class="toasts" id="toasts"></div>
+<script src="/a.js"></script>
+</body>
+</html>
