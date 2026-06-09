@@ -6,18 +6,28 @@ final class InstagramBridge
 {
     private static function pythonBin(): string
     {
-        $candidates = [
-            dirname(BASE_PATH) . '/instagram-handler/venv/bin/python3',
+        $fromEnv = trim(getenv('PYTHON_BRIDGE_BIN') ?: '');
+        if ($fromEnv !== '') {
+            return $fromEnv;
+        }
+
+        $home = getenv('HOME') ?: '';
+        $candidates = array_filter([
+            $home ? $home . '/ig-handler/instagram-handler/venv/bin/python' : null,
+            $home ? $home . '/ig-handler/instagram-handler/venv/bin/python3' : null,
             dirname(BASE_PATH) . '/instagram-handler/venv/bin/python',
-            'python3',
+            dirname(BASE_PATH) . '/instagram-handler/venv/bin/python3',
+            '/usr/bin/python',
             'python',
-        ];
+            'python3',
+        ]);
+
         foreach ($candidates as $bin) {
-            if ($bin === 'python3' || $bin === 'python' || is_executable($bin)) {
+            if ($bin === 'python' || $bin === 'python3' || is_executable($bin)) {
                 return $bin;
             }
         }
-        return 'python3';
+        return 'python';
     }
 
     public static function call(string $action, array $params): array
