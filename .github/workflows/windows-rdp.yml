@@ -1,0 +1,149 @@
+name: Windows Free RDP
+
+on:
+  workflow_dispatch:
+    inputs:
+      ngrok_region:
+        description: "Ngrok region (us, eu, ap, au, sa, jp, in)"
+        required: false
+        default: "ap"
+        type: choice
+        options:
+          - us
+          - eu
+          - ap
+          - au
+          - sa
+          - jp
+          - in
+      custom_password:
+        description: "Custom RDP password (leave empty for auto-generated)"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  rdp:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Validate ngrok token
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NGROK_AUTH_TOKEN)) {
+            throw "Missing NGROK_AUTH_TOKEN secret. Add it in Settings > Secrets and variables > Actions."
+          }
+
+      - name: Download ngrok
+        shell: pwsh
+        run: |
+          $ngrokZip = "$env:RUNNER_TEMP\ngrok.zip"
+          Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" -OutFile $ngrokZip
+          Expand-Archive -Path $ngrokZip -DestinationPath "$env:RUNNER_TEMP\ngrok" -Force
+          echo "NGROK_EXE=$env:RUNNER_TEMP\ngrok\ngrok.exe" >> $env:GITHUB_ENV
+
+      - name: Authenticate ngrok
+        shell: pwsh
+        run: & $env:NGROK_EXE config add-authtoken $env:NGROK_AUTH_TOKEN
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+
+      - name: Enable Remote Desktop
+        shell: pwsh
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name 'fDenyTSConnections' -Value 0
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name 'UserAuthentication' -Value 0
+          Enable-NetFirewallRule -DisplayGroup 'Remote Desktop'
+          Restart-Service -Name TermService -Force
+
+      - name: Set RDP credentials
+        id: creds
+        shell: pwsh
+        run: |
+          $custom = '${{ github.event.inputs.custom_password }}'
+          if ([string]::IsNullOrWhiteSpace($custom)) {
+            $custom = '${{ secrets.RDP_PASSWORD }}'
+          }
+          if ([string]::IsNullOrWhiteSpace($custom)) {
+            $chars = (48..57) + (65..90) + (97..122) + @(33, 35, 36, 37, 64)
+            $custom = -join ($chars | Get-Random -Count 16 | ForEach-Object { [char]$_ })
+          }
+          if ($custom.Length -lt 8) {
+            throw "Password must be at least 8 characters."
+          }
+
+          $username = 'runneradmin'
+          net user $username $custom /add 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            net user $username $custom
+          }
+          net localgroup Administrators $username /add 2>$null
+
+          "username=$username" >> $env:GITHUB_OUTPUT
+          "password=$custom" >> $env:GITHUB_OUTPUT
+
+      - name: Start ngrok tunnel
+        shell: pwsh
+        run: |
+          $region = '${{ github.event.inputs.ngrok_region }}'
+          if ([string]::IsNullOrWhiteSpace($region)) { $region = 'ap' }
+          Start-Process -FilePath $env:NGROK_EXE -ArgumentList "tcp","--region=$region","3389" -WindowStyle Hidden
+          Start-Sleep -Seconds 15
+
+      - name: Fetch ngrok public URL
+        id: tunnel
+        shell: pwsh
+        run: |
+          $url = $null
+          for ($i = 0; $i -lt 20; $i++) {
+            try {
+              $response = Invoke-RestMethod -Uri 'http://127.0.0.1:4040/api/tunnels' -ErrorAction Stop
+              $tcpTunnel = $response.tunnels | Where-Object { $_.proto -eq 'tcp' } | Select-Object -First 1
+              if ($tcpTunnel) {
+                $url = $tcpTunnel.public_url
+                break
+              }
+            } catch {}
+            Start-Sleep -Seconds 3
+          }
+
+          if (-not $url) {
+            throw "Could not get ngrok tunnel URL. Check NGROK_AUTH_TOKEN and ngrok dashboard."
+          }
+
+          $hostPort = $url -replace '^tcp://', ''
+          "public_url=$url" >> $env:GITHUB_OUTPUT
+          "host_port=$hostPort" >> $env:GITHUB_OUTPUT
+
+      - name: Print RDP connection details
+        shell: pwsh
+        run: |
+          $details = @"
+          ============================================
+          WINDOWS FREE RDP - CONNECTION DETAILS
+          ============================================
+          Address : ${{ steps.tunnel.outputs.host_port }}
+          Username: ${{ steps.creds.outputs.username }}
+          Password: ${{ steps.creds.outputs.password }}
+          Region  : ${{ github.event.inputs.ngrok_region }}
+          Valid   : up to 6 hours (GitHub runner limit)
+          ============================================
+          Open Windows Remote Desktop (mstsc) and enter the address above.
+          "@
+
+          Write-Host $details
+          $details | Out-File -FilePath rdp-connection.txt -Encoding utf8
+
+      - name: Upload connection file
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdp-connection-details
+          path: rdp-connection.txt
+          retention-days: 1
+
+      - name: Keep session alive
+        shell: pwsh
+        run: |
+          Write-Host "RDP session is active. This job will stay alive for up to 6 hours."
+          Start-Sleep -Seconds 21540
